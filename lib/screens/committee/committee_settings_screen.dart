@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/change_password_widget.dart';
+import '../shared/messages_screen.dart';
+import '../auth/sign_out_screen.dart';
 import 'committee_nav_bar.dart';
+import 'committee_dashboard_screen.dart';
 
 class CommitteeSettingsScreen extends StatelessWidget {
   const CommitteeSettingsScreen({super.key});
@@ -9,38 +13,70 @@ class CommitteeSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).maybePop(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.of(context).pushReplacementNamed(CommitteeDashboardScreen.routeName);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Settings'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pushReplacementNamed(CommitteeDashboardScreen.routeName),
+          ),
         ),
-      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           _SettingsTile(
-            title: 'Profile',
-            subtitle: 'Update committee member details.',
-            icon: Icons.person,
-            onTap: () {},
-          ),
-          _SettingsTile(
-            title: 'Notifications',
-            subtitle: 'Manage review and viva alerts.',
-            icon: Icons.notifications_none,
-            onTap: () {},
-          ),
-          _SettingsTile(
             title: 'Security',
             subtitle: 'Update your password.',
             icon: Icons.lock_outline,
-            onTap: () {},
+            onTap: () => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              builder: (_) => Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                  left: 16,
+                  right: 16,
+                  top: 8,
+                ),
+                child: const SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(height: 8),
+                      ChangePasswordWidget(),
+                      SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Account Management',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          _SettingsTile(
+            title: 'Sign Out or Delete Account',
+            subtitle: 'Sign out of your session or permanently delete your data.',
+            icon: Icons.logout,
+            onTap: () =>
+                Navigator.of(context).pushNamed(SignOutScreen.routeName),
           ),
         ],
       ),
-      bottomNavigationBar: const CommitteeNavBar(selectedIndex: 0),
+      bottomNavigationBar: const CommitteeNavBar(selectedIndex: 3),
+      ),
     );
   }
 }
@@ -70,8 +106,8 @@ class _SettingsTile extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFFE8EEF6),
-          child: Icon(icon, color: const Color(0xFF1B1B1B)),
+          backgroundColor: const Color(0xFFEDF1F9),
+          child: Icon(icon, color: const Color(0xFF14375E)),
         ),
         title: Text(title),
         subtitle: Text(subtitle),

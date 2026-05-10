@@ -1,3 +1,4 @@
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 class AdminCommitteeAccessScreen extends StatelessWidget {
@@ -7,51 +8,125 @@ class AdminCommitteeAccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final usersRef = FirebaseDatabase.instance.ref('users');
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Member Access'),
+        title: const Text('Committee Access'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: const [
-          _AccessTile(name: 'Dr. Nida', status: 'Approved'),
-          _AccessTile(name: 'Dr. Usman', status: 'Pending'),
-          _AccessTile(name: 'Dr. Zara', status: 'Review'),
-        ],
-      ),
-    );
-  }
-}
+      body: StreamBuilder<DatabaseEvent>(
+        stream: usersRef.orderByChild('role').equalTo('Committee').onValue,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final data = snapshot.data?.snapshot.value;
 
-class _AccessTile extends StatelessWidget {
-  const _AccessTile({required this.name, required this.status});
+          // Fallback: also query Pending with requestedRole=Committee
+          return StreamBuilder<DatabaseEvent>(
+            stream: usersRef.onValue,
+            builder: (context, allSnap) {
+              if (allSnap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final allData = allSnap.data?.snapshot.value;
+              if (allData is! Map) {
+                return const Center(child: Text('No committee members found.'));
+              }
 
-  final String name;
-  final String status;
+              final all = Map<String, dynamic>.from(allData);
+              final committee = all.entries.where((e) {
+                if (e.value is! Map) return false;
+                final u = Map<String, dynamic>.from(e.value as Map);
+                final role = (u['role'] as String?) ?? '';
+                final requested = (u['requestedRole'] as String?) ?? '';
+                return role == 'Committee' ||
+                    (role == 'Pending' && requested == 'Committee');
+              }).toList();
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE6E6E6)),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        leading: const CircleAvatar(
-          backgroundColor: Color(0xFFE8EEF6),
-          child: Icon(Icons.group_work, color: Color(0xFF1B1B1B)),
-        ),
-        title: Text(name),
-        subtitle: Text('Status: $status'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () {},
+              if (committee.isEmpty) {
+                return const Center(
+                    child: Text('No committee accounts registered.'));
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: committee.length,
+                itemBuilder: (context, index) {
+                  final uid = committee[index].key;
+                  final user =
+                      Map<String, dynamic>.from(committee[index].value as Map);
+                  final name = (user['displayName'] as String?) ??
+                      (user['email'] as String?) ??
+                      uid;
+                  final role = (user['role'] as String?) ?? '';
+                  final status = (user['status'] as String?) ?? 'Active';
+                  final isPending = role == 'Pending';
+
+                  return Card(
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: const Color(0xFFEDF1F9),
+                        child: const Icon(Icons.group_work,
+                            color: Color(0xFF14375E)),
+                      ),
+                      title: Text(name,
+                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text(isPending ? 'Pending Approval' : status,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isPending
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFF16A34A),
+                            fontWeight: FontWeight.w600,
+                          )),
+                      trailing: isPending
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.close,
+                                      color: Color(0xFFDC2626)),
+                                  onPressed: () async {
+                                    await usersRef.child(uid).update({
+                                      'role': 'Rejected',
+                                      'status': 'Rejected',
+                                    });
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.check,
+                                      color: Color(0xFF16A34A)),
+                                  onPressed: () async {
+                                    await usersRef.child(uid).update({
+                                      'role': 'Committee',
+                                      'status': 'Active',
+                                    });
+                                  },
+                                ),
+                              ],
+                            )
+                          : TextButton(
+                              style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFFDC2626)),
+                              onPressed: () async {
+                                await usersRef.child(uid).update({
+                                  'status': 'Deactivated',
+                                });
+                              },
+                              child: const Text('Revoke'),
+                            ),
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
       ),
     );
   }

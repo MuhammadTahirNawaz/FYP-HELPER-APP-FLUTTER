@@ -1,332 +1,2302 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-
-import '../auth/sign_in_screen.dart';
-import '../auth/sign_out_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../services/crypto_service.dart';
+import '../shared/messages_screen.dart';
 import 'supervisor_nav_bar.dart';
-import 'supervisor_profile_screen.dart';
-import 'supervisor_progress_reports_screen.dart';
-import 'supervisor_requests_screen.dart';
 
-class SupervisorDashboardScreen extends StatelessWidget {
+enum _SupervisorSection {
+  dashboard,
+  groups,
+  proposals,
+  tasks,
+  documents,
+  comments,
+  meetings,
+  progress,
+  marks,
+  deadlines,
+  sharedDocuments,
+}
+
+class SupervisorDashboardScreen extends StatefulWidget {
   const SupervisorDashboardScreen({super.key});
 
   static const String routeName = '/supervisor-dashboard';
 
-  static const List<_GroupInfo> _groups = [
-    _GroupInfo('Group A', 'Smart Attendance', 0.65, 5),
-    _GroupInfo('Group B', 'AI Tutor', 0.4, 4),
-    _GroupInfo('Group C', 'Lab Scheduler', 0.85, 3),
-  ];
+  @override
+  State<SupervisorDashboardScreen> createState() =>
+      _SupervisorDashboardScreenState();
+}
+
+class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
+  _SupervisorSection _currentSection = _SupervisorSection.dashboard;
+  late String _supervisorUid;
+
+  @override
+  void initState() {
+    super.initState();
+    _supervisorUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+  }
+
+  String _sectionTitle(_SupervisorSection section) {
+    switch (section) {
+      case _SupervisorSection.dashboard: return 'Dashboard';
+      case _SupervisorSection.groups: return 'Groups';
+      case _SupervisorSection.proposals: return 'Proposals';
+      case _SupervisorSection.tasks: return 'Tasks';
+      case _SupervisorSection.documents: return 'Documents';
+      case _SupervisorSection.comments: return 'Comments';
+      case _SupervisorSection.meetings: return 'Meetings';
+      case _SupervisorSection.progress: return 'Progress';
+      case _SupervisorSection.marks: return 'Marks';
+      case _SupervisorSection.deadlines: return 'Deadlines';
+      case _SupervisorSection.sharedDocuments: return 'Shared Documents';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(
-            context,
-          ).pushNamedAndRemoveUntil(SignInScreen.routeName, (route) => false),
-          tooltip: 'Back to Sign In',
+        elevation: 0,
+        centerTitle: false,
+        backgroundColor: const Color(0xFF14375E),
+        foregroundColor: Colors.white,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _sectionTitle(_currentSection),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Colors.white),
+            ),
+            Text(
+              'Supervisor workspace',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Colors.white60,
+                    fontSize: 11,
+                  ),
+            ),
+          ],
         ),
-        title: const Text('LOGO'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none),
-            onPressed: () => Navigator.of(
-              context,
-            ).pushNamed(SupervisorRequestsScreen.routeName),
-            tooltip: 'Requests',
+            icon: const Icon(Icons.account_circle, color: Colors.white),
+            onPressed: () => Navigator.of(context).pushNamed('/supervisor-settings'),
           ),
-          IconButton(
-            icon: const Icon(Icons.account_circle),
-            onPressed: () => Navigator.of(
-              context,
-            ).pushNamed(SupervisorProfileScreen.routeName),
-            tooltip: 'Profile',
+          const SizedBox(width: 8),
+        ],
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF14375E), Color(0xFF1E6091)],
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () =>
-                Navigator.of(context).pushNamed(SignOutScreen.routeName),
-            tooltip: 'Sign Out',
+        ),
+      ),
+      drawer: _SupervisorDrawer(
+        selected: _currentSection,
+        onSelected: (section) {
+          setState(() => _currentSection = section);
+          Navigator.pop(context);
+        },
+      ),
+      body: PopScope(
+        canPop: _currentSection == _SupervisorSection.dashboard,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) {
+            setState(() => _currentSection = _SupervisorSection.dashboard);
+          }
+        },
+        child: _buildSectionBody(),
+      ),
+
+      bottomNavigationBar: const SupervisorNavBar(selectedIndex: 0),
+    );
+  }
+
+  Widget _buildSectionBody() {
+    final groupsRef = FirebaseDatabase.instance.ref('groups');
+    final supervisorRef =
+        FirebaseDatabase.instance.ref('supervisor').child(_supervisorUid);
+    final adminRef = FirebaseDatabase.instance.ref('admin');
+
+    switch (_currentSection) {
+      case _SupervisorSection.dashboard:
+        return _SupervisorDashboardHome(
+          supervisorUid: _supervisorUid,
+          groupsRef: groupsRef,
+          supervisorRef: supervisorRef,
+        );
+      case _SupervisorSection.groups:
+        return _AssignedGroupsSection(
+            supervisorUid: _supervisorUid, groupsRef: groupsRef);
+      case _SupervisorSection.proposals:
+        return _ProposalsReviewSection(
+            supervisorUid: _supervisorUid, groupsRef: groupsRef);
+      case _SupervisorSection.tasks:
+        return _TasksSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+      case _SupervisorSection.documents:
+        return _DocumentsReviewSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+      case _SupervisorSection.comments:
+        return _CommentsSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+      case _SupervisorSection.meetings:
+        return _MeetingRequestsSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+      case _SupervisorSection.progress:
+        return _ProgressMonitoringSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+      case _SupervisorSection.marks:
+        return _MarksRemarksSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+      case _SupervisorSection.deadlines:
+        return _DeadlinesSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+      case _SupervisorSection.sharedDocuments:
+        return const _SharedDocumentsSection();
+    }
+  }
+}
+
+class _SupervisorDrawer extends StatelessWidget {
+  const _SupervisorDrawer({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final _SupervisorSection selected;
+  final Function(_SupervisorSection) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF14375E), Color(0xFF1E6091)],
+              ),
+            ),
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const CircleAvatar(
+                    radius: 22,
+                    backgroundColor: Colors.white,
+                    child: Icon(Icons.supervisor_account,
+                        color: Color(0xFF14375E)),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Supervisor Menu',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Requests, approvals, tasks and feedback',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white70,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          _drawerItem(context, Icons.dashboard, 'Dashboard',
+              _SupervisorSection.dashboard),
+          _drawerItem(
+              context, Icons.group, 'Groups', _SupervisorSection.groups),
+          _drawerItem(context, Icons.assignment, 'Proposals',
+              _SupervisorSection.proposals),
+          _drawerItem(
+              context, Icons.task_alt, 'Tasks', _SupervisorSection.tasks),
+          _drawerItem(context, Icons.description, 'Documents',
+              _SupervisorSection.documents),
+          _drawerItem(context, Icons.comment, 'Comments',
+              _SupervisorSection.comments),
+          _drawerItem(
+              context, Icons.event, 'Meetings', _SupervisorSection.meetings),
+          _drawerItem(context, Icons.trending_up, 'Progress',
+              _SupervisorSection.progress),
+          _drawerItem(context, Icons.grade, 'Marks', _SupervisorSection.marks),
+          _drawerItem(context, Icons.calendar_today, 'Deadlines', _SupervisorSection.deadlines),
+          _drawerItem(context, Icons.folder_shared, 'Shared Documents', _SupervisorSection.sharedDocuments),
+        ],
+      ),
+    );
+  }
+
+  Widget _drawerItem(BuildContext context, IconData icon, String label,
+      _SupervisorSection section) {
+    final isSelected = selected == section;
+    return ListTile(
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      tileColor:
+          isSelected ? const Color(0xFFEDF1F9) : Colors.transparent,
+      leading: Icon(icon,
+          color: isSelected
+              ? const Color(0xFF1E6091)
+              : const Color(0xFF6B7A99)),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: isSelected
+              ? const Color(0xFF14375E)
+              : const Color(0xFF6B7A99),
+          fontWeight:
+              isSelected ? FontWeight.w700 : FontWeight.w500,
+        ),
+      ),
+      selected: isSelected,
+      onTap: () => onSelected(section),
+    );
+  }
+}
+
+class _SupervisorDashboardHome extends StatelessWidget {
+  const _SupervisorDashboardHome({
+    required this.supervisorUid,
+    required this.groupsRef,
+    required this.supervisorRef,
+  });
+
+  final String supervisorUid;
+  final DatabaseReference groupsRef;
+  final DatabaseReference supervisorRef;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DatabaseEvent>(
+      stream: groupsRef.onValue,
+      builder: (context, groupsSnapshot) {
+        final allGroups = groupsSnapshot.data?.snapshot.value is Map
+            ? Map<String, dynamic>.from(groupsSnapshot.data!.snapshot.value as Map)
+            : {};
+        final myGroups = allGroups.values.where((g) => g is Map && g['supervisorId'] == supervisorUid).toList();
+        final assignedGroupsCount = myGroups.length;
+
+        return StreamBuilder<DatabaseEvent>(
+          stream: supervisorRef.child('requests').onValue,
+          builder: (context, requestsSnapshot) {
+            final requests = requestsSnapshot.data?.snapshot.value is Map
+                ? Map<String, dynamic>.from(requestsSnapshot.data!.snapshot.value as Map)
+                : {};
+            final pendingRequestsCount = requests.values.where((r) => r is Map && r['status'] == 'Pending').length;
+
+            int activeTasksCount = 0;
+            int pendingGradesCount = 0;
+            for (final g in myGroups) {
+              if (g is Map) {
+                if (g['tasks'] is Map) {
+                  activeTasksCount += (g['tasks'] as Map).length;
+                }
+                if (g['marks'] == null) {
+                  pendingGradesCount++;
+                }
+              }
+            }
+
+            final scheduledVivas = myGroups.where((g) => g is Map && g['vivaDate'] != null).toList();
+
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                if (scheduledVivas.isNotEmpty) ...[
+                  Text(
+                    'UPCOMING VIVAS',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: const Color(0xFF64748B),
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.1,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...scheduledVivas.map((group) {
+                    final groupData = Map<String, dynamic>.from(group as Map);
+                    final vivaDate = DateTime.parse(groupData['vivaDate'] as String);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF14375E), Color(0xFF1E6091)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 20,
+                            backgroundColor: Colors.white24,
+                            child: Icon(Icons.event, color: Colors.white, size: 20),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Group: ${groupData['projectTitle'] ?? 'Untitled'}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                Text(
+                                  'Scheduled: ${vivaDate.toLocal().toString().split(' ')[0]}',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 14),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 16),
+                ],
+                const _SectionBanner(
+                  title: 'Supervisor Overview',
+                  subtitle: 'Keep requests, proposals, tasks, and marks under control in real time.',
+                  icon: Icons.insights,
+                ),
+                const SizedBox(height: 16),
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  children: [
+                    _StatCard(title: 'Assigned Groups', value: assignedGroupsCount.toString(), icon: Icons.group, color: const Color(0xFF1E6091)),
+                    _StatCard(title: 'Pending Requests', value: pendingRequestsCount.toString(), icon: Icons.pending_actions, color: const Color(0xFFF59E0B)),
+                    _StatCard(title: 'Active Tasks', value: activeTasksCount.toString(), icon: Icons.assignment_turned_in, color: const Color(0xFF10B981)),
+                    _StatCard(title: 'Pending Grades', value: pendingGradesCount.toString(), icon: Icons.grade, color: const Color(0xFF6366F1)),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [color.withOpacity(0.16), Colors.white],
+        ),
+        border: Border.all(color: color.withOpacity(0.12)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: color.withOpacity(0.14),
+              child: Icon(icon, size: 20, color: color),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF14375E),
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF6B7A99),
+                    fontWeight: FontWeight.w600,
+                  ),
+              textAlign: TextAlign.left,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionBanner extends StatelessWidget {
+  const _SectionBanner({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF14375E), Color(0xFF1E6091)],
+        ),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: Colors.white.withOpacity(0.16),
+            child: Icon(icon, color: Colors.white),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white70,
+                        height: 1.4,
+                      ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    );
+  }
+}
+
+class _SupervisionRequestsSection extends StatelessWidget {
+  const _SupervisionRequestsSection({required this.supervisorRef});
+
+  final DatabaseReference supervisorRef;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DatabaseEvent>(
+      stream: supervisorRef.child('requests').onValue,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final data = snapshot.data?.snapshot.value;
+        if (data is! Map) {
+          return const Center(child: Text('No requests yet.'));
+        }
+        final entries = Map<String, dynamic>.from(data);
+        final requests = entries.entries
+            .map((e) => _RequestItem(
+                  id: e.key,
+                  studentId: (e.value is Map
+                      ? ((e.value as Map)['studentId'] as String?) ?? ''
+                      : ''),
+                  studentName: (e.value is Map
+                      ? ((e.value as Map)['studentName'] as String?) ?? ''
+                      : ''),
+                  status: (e.value is Map
+                      ? ((e.value as Map)['status'] as String?) ?? ''
+                      : ''),
+                ))
+            .toList();
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: Color(0xFFE6E6E6)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        'DASHBOARD',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 6),
-                      const SizedBox(height: 12, child: _WavyDivider()),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
+            Text('Supervision Requests',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 16),
+            ...requests
+                .map((r) =>
+                    _RequestCard(request: r, supervisorRef: supervisorRef))
+                .toList(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _RequestItem {
+  _RequestItem({
+    required this.id,
+    required this.studentId,
+    required this.studentName,
+    required this.status,
+  });
+
+  final String id;
+  final String studentId;
+  final String studentName;
+  final String status;
+}
+
+class _RequestCard extends StatelessWidget {
+  const _RequestCard({required this.request, required this.supervisorRef});
+
+  final _RequestItem request;
+  final DatabaseReference supervisorRef;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Row(
               children: [
                 Expanded(
-                  child: _SummaryCard(
-                    icon: Icons.people_alt,
-                    label: 'Requests',
-                    value: '5',
-                    color: colorScheme.primary,
-                    onTap: () => Navigator.of(
-                      context,
-                    ).pushNamed(SupervisorRequestsScreen.routeName),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(request.studentName,
+                          style: Theme.of(context).textTheme.titleSmall),
+                      Text('ID: ${request.studentId}',
+                          style: Theme.of(context).textTheme.bodySmall),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                Chip(
+                  label: Text(request.status),
+                  backgroundColor: request.status == 'Pending'
+                      ? Colors.orange
+                      : (request.status == 'Accepted'
+                          ? Colors.green
+                          : Colors.red),
+                  labelStyle: const TextStyle(color: Colors.white),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (request.status == 'Pending')
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _updateStatus(context, 'Rejected'),
+                      child: const Text('Reject'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => _updateStatus(context, 'Accepted'),
+                      child: const Text('Accept'),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _updateStatus(BuildContext context, String status) async {
+    try {
+      await supervisorRef
+          .child('requests')
+          .child(request.id)
+          .update({'status': status});
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Request $status')));
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+}
+
+class _AssignedGroupsSection extends StatelessWidget {
+  const _AssignedGroupsSection(
+      {required this.supervisorUid, required this.groupsRef});
+
+  final String supervisorUid;
+  final DatabaseReference groupsRef;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DatabaseEvent>(
+      stream: groupsRef.onValue,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final data = snapshot.data?.snapshot.value;
+        if (data is! Map) {
+          return const Center(child: Text('No groups assigned.'));
+        }
+        final entries = Map<String, dynamic>.from(data);
+        final assignedGroups = entries.entries
+            .where((e) =>
+                e.value is Map &&
+                ((e.value as Map)['supervisorId'] == supervisorUid))
+            .map((e) {
+              final groupData = Map<String, dynamic>.from(e.value as Map);
+              final membersMap = groupData['members'] is Map ? Map<String, dynamic>.from(groupData['members'] as Map) : {};
+              final memberNames = membersMap.values.map((m) => (m is Map ? m['name'] ?? 'Unknown' : 'Unknown')).toList();
+              
+              return _GroupItem(
+                code: e.key,
+                projectTitle: groupData['projectTitle'] ?? 'No Title',
+                status: groupData['status'] ?? 'Active',
+                memberCount: membersMap.length,
+                memberUids: membersMap.keys.cast<String>().toList(),
+              );
+            })
+            .toList();
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('Assigned Groups',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 16),
+            ...assignedGroups
+                .map((g) => _GroupItemCard(group: g))
+                .toList(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _GroupItem {
+  _GroupItem({
+    required this.code,
+    required this.projectTitle,
+    required this.status,
+    required this.memberCount,
+    required this.memberUids,
+  });
+
+  final String code;
+  final String projectTitle;
+  final String status;
+  final int memberCount;
+  final List<String> memberUids;
+}
+
+class _GroupItemCard extends StatelessWidget {
+  const _GroupItemCard({required this.group});
+
+  final _GroupItem group;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: () => _showGroupDetails(context),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(group.projectTitle, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text('Code: ${group.code}', style: const TextStyle(color: Color(0xFF1E6091), fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  Chip(
+                    label: Text(group.status, style: const TextStyle(fontSize: 10)),
+                    backgroundColor: const Color(0xFFEEF2FF),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('Members: ${group.memberCount}', style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showGroupDetails(BuildContext context) {
+    final usersRef = FirebaseDatabase.instance.ref('users');
+    final crypto = CryptoService();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(group.projectTitle, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                        const SizedBox(height: 4),
+                        Text('Group Code: ${group.code}', style: const TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(20)),
+                    child: Text(group.status, style: const TextStyle(color: Color(0xFF4F46E5), fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+              const Divider(height: 40),
+              const Text('Group Members', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 16),
+              ...group.memberUids.map((uid) => FutureBuilder<DataSnapshot>(
+                    future: usersRef.child(uid).get(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: LinearProgressIndicator(),
+                        );
+                      }
+                      final data = snapshot.data?.value as Map?;
+                      if (data == null) {
+                        return const ListTile(title: Text('Unknown User'), leading: Icon(Icons.error_outline));
+                      }
+
+                      final name = data['fullName'] ?? 'No Name';
+                      final studentId = data['studentId'] ?? 'No ID';
+                      final encryptedPhone = data['phoneEncrypted'] as String?;
+                      String? phone;
+                      if (encryptedPhone != null) {
+                        try {
+                          phone = crypto.decryptText(encryptedPhone);
+                        } catch (_) {
+                          phone = 'Encryption Error';
+                        }
+                      }
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFF3B82F6),
+                            child: Text(name[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
+                          ),
+                          title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('ID: $studentId', style: const TextStyle(fontSize: 12)),
+                              if (phone != null)
+                                Text('Phone: $phone', style: const TextStyle(fontSize: 12, color: Color(0xFF3B82F6), fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                          trailing: phone != null
+                              ? IconButton(
+                                  icon: const Icon(Icons.phone_outlined, size: 20),
+                                  onPressed: () async {
+                                    final url = Uri.parse('tel:$phone');
+                                    if (await canLaunchUrl(url)) await launchUrl(url);
+                                  },
+                                )
+                              : null,
+                        ),
+                      );
+                    },
+                  )),
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProposalsReviewSection extends StatelessWidget {
+  const _ProposalsReviewSection(
+      {required this.supervisorUid, required this.groupsRef});
+
+  final String supervisorUid;
+  final DatabaseReference groupsRef;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DatabaseEvent>(
+      stream: groupsRef.onValue,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final data = snapshot.data?.snapshot.value;
+        if (data is! Map) {
+          return const Center(child: Text('No proposals found.'));
+        }
+        final entries = Map<String, dynamic>.from(data);
+        final proposals = entries.entries
+            .where((e) =>
+                e.value is Map &&
+                ((e.value as Map)['supervisorId'] == supervisorUid))
+            .map((e) => _ProposalItem(
+                  groupCode: e.key,
+                  projectTitle: (e.value is Map
+                      ? ((e.value as Map)['projectTitle'] as String?) ?? ''
+                      : ''),
+                  description: (e.value is Map
+                      ? ((e.value as Map)['description'] as String?) ?? ''
+                      : ''),
+                  proposalStatus: (e.value is Map
+                      ? ((e.value as Map)['proposalStatus'] as String?) ?? ''
+                      : ''),
+                  proposalUrl: (e.value is Map
+                      ? ((e.value as Map)['proposalUrl'] as String?)
+                      : null),
+                  marks: (e.value is Map
+                      ? (e.value as Map)['marks']
+                      : null),
+                  remarks: (e.value is Map
+                      ? (e.value as Map)['remarks']
+                      : null),
+                ))
+            .toList();
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('Proposals Review',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 16),
+            ...proposals
+                .map((p) =>
+                    _ProposalCard(proposal: p, groupsRef: groupsRef))
+                .toList(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ProposalItem {
+  _ProposalItem({
+    required this.groupCode,
+    required this.projectTitle,
+    required this.description,
+    required this.proposalStatus,
+    this.proposalUrl,
+    this.marks,
+    this.remarks,
+  });
+
+  final String groupCode;
+  final String projectTitle;
+  final String description;
+  final String proposalStatus;
+  final String? proposalUrl;
+  final dynamic marks;
+  final String? remarks;
+}
+
+class _ProposalCard extends StatefulWidget {
+  const _ProposalCard({required this.proposal, required this.groupsRef});
+
+  final _ProposalItem proposal;
+  final DatabaseReference groupsRef;
+
+  @override
+  State<_ProposalCard> createState() => _ProposalCardState();
+}
+
+class _ProposalCardState extends State<_ProposalCard> {
+  bool _isUpdating = false;
+  late TextEditingController _marksController;
+  late TextEditingController _remarksController;
+  @override
+  void initState() {
+    super.initState();
+    _marksController = TextEditingController(text: widget.proposal.marks?.toString() ?? '');
+    _remarksController = TextEditingController(text: widget.proposal.remarks ?? '');
+  }
+
+  @override
+  void didUpdateWidget(_ProposalCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.proposal.marks != oldWidget.proposal.marks) {
+      _marksController.text = widget.proposal.marks?.toString() ?? '';
+    }
+    if (widget.proposal.remarks != oldWidget.proposal.remarks) {
+      _remarksController.text = widget.proposal.remarks ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _marksController.dispose();
+    _remarksController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _viewDocument() async {
+    if (widget.proposal.proposalUrl != null) {
+      final url = Uri.parse(widget.proposal.proposalUrl!);
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open proposal document.')),
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isSubmitted = widget.proposal.proposalStatus == 'Submitted';
+    final bool isApproved = widget.proposal.proposalStatus == 'Approved by Supervisor';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ExpansionTile(
+        title: Text(widget.proposal.projectTitle.isEmpty ? 'Untitled Project' : widget.proposal.projectTitle),
+        subtitle: Chip(
+          label: Text(widget.proposal.proposalStatus),
+          backgroundColor: _getStatusColor(),
+          labelStyle:
+              const TextStyle(color: Colors.white, fontSize: 12),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.proposal.proposalUrl != null) ...[
+                  ElevatedButton.icon(
+                    onPressed: _viewDocument,
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: const Text('View Proposal Document'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red[700],
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                Text('Description:',
+                    style: Theme.of(context).textTheme.titleSmall),
+                Text(widget.proposal.description.isEmpty ? 'No description provided.' : widget.proposal.description,
+                    style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _marksController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Proposal Marks (0-100)',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.grade),
+                  ),
+                ),
+                TextField(
+                  controller: _remarksController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Feedback / Remarks',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.comment),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (isSubmitted)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _isUpdating
+                              ? null
+                              : () => _updateProposal(
+                                  'Rejected by Supervisor'),
+                          child: const Text('Reject'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: _isUpdating
+                              ? null
+                              : () => _updateProposal(
+                                  'Approved by Supervisor'),
+                          child: _isUpdating
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2))
+                              : const Text('Approve'),
+                        ),
+                      ),
+                    ],
+                  )
+                else if (isApproved)
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _isUpdating ? null : () => _updateProposal('Approved by Supervisor'),
+                      icon: const Icon(Icons.save),
+                      label: const Text('Update Marks'),
+                      style: FilledButton.styleFrom(backgroundColor: Colors.green[700]),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getStatusColor() {
+    switch (widget.proposal.proposalStatus) {
+      case 'Submitted':
+        return Colors.orange;
+      case 'Approved by Supervisor':
+        return Colors.green;
+      case 'Rejected by Supervisor':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Future<void> _updateProposal(String status) async {
+    if (!mounted) return;
+    setState(() => _isUpdating = true);
+    try {
+      final marks = int.tryParse(_marksController.text) ?? 0;
+      await widget.groupsRef
+          .child(widget.proposal.groupCode)
+          .update({
+        'proposalStatus': status,
+        'supervisorApproved': status == 'Approved by Supervisor',
+        'marks': status == 'Approved by Supervisor' ? marks : widget.proposal.marks,
+        'remarks': _remarksController.text.trim(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Proposal $status')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+      }
+    }
+  }
+}
+
+class _TasksSection extends StatelessWidget {
+  const _TasksSection({required this.supervisorUid, required this.groupsRef});
+
+  final String supervisorUid;
+  final DatabaseReference groupsRef;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DatabaseEvent>(
+      stream: groupsRef.onValue,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final data = snapshot.data?.snapshot.value;
+        if (data is! Map) return const Center(child: Text('No groups found.'));
+
+        final myGroups = Map<String, dynamic>.from(data).entries.where((e) {
+          final val = e.value;
+          return val is Map && val['supervisorId'] == supervisorUid;
+        }).toList();
+
+        final allTasks = <_TaskItem>[];
+        for (final group in myGroups) {
+          final groupData = group.value as Map;
+          if (groupData['tasks'] is Map) {
+            final tasks = Map<String, dynamic>.from(groupData['tasks']);
+            tasks.forEach((id, val) {
+              if (val is Map) {
+                allTasks.add(_TaskItem(
+                  id: id,
+                  groupCode: group.key,
+                  title: val['title'] ?? '',
+                  description: val['description'] ?? '',
+                  deadline: val['deadline'] ?? '',
+                  deadlineTime: val['deadlineTime'] ?? '',
+                  status: val['status'] ?? 'Pending',
+                  submission: val['submission'],
+                  memberMarks: val['memberMarks'] is Map ? Map<String, dynamic>.from(val['memberMarks'] as Map) : null,
+                ));
+              }
+            });
+          }
+        }
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Tasks & Milestones', style: Theme.of(context).textTheme.titleMedium),
+                if (myGroups.isNotEmpty)
+                  FilledButton.icon(
+                    onPressed: () => _showCreateTaskDialog(context, myGroups),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add'),
+                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF14375E)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (allTasks.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No tasks created yet.'))),
+            ...allTasks.map((t) => _TaskCard(task: t, groupsRef: groupsRef)).toList(),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showCreateTaskDialog(BuildContext context, List<MapEntry<String, dynamic>> groups) {
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
+    final deadlineController = TextEditingController();
+    final timeController = TextEditingController();
+    String? selectedGroup = groups.first.key;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Create Group Task'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedGroup,
+                  items: groups.map((g) => DropdownMenuItem(value: g.key, child: Text(g.key))).toList(),
+                  onChanged: (v) => setDialogState(() => selectedGroup = v),
+                  decoration: const InputDecoration(labelText: 'Target Group'),
+                ),
+                TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Task Title')),
+                TextField(controller: descController, decoration: const InputDecoration(labelText: 'Description')),
+                TextField(
+                  controller: deadlineController,
+                  decoration: const InputDecoration(labelText: 'Deadline Date', hintText: 'YYYY-MM-DD'),
+                  readOnly: true,
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 90)),
+                    );
+                    if (date != null) {
+                      setDialogState(() => deadlineController.text = date.toString().split(' ')[0]);
+                    }
+                  },
+                ),
+                TextField(
+                  controller: timeController,
+                  decoration: const InputDecoration(labelText: 'Deadline Time', hintText: 'HH:MM'),
+                  readOnly: true,
+                  onTap: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.now(),
+                    );
+                    if (time != null) {
+                      if (context.mounted) {
+                        setDialogState(() => timeController.text = time.format(context));
+                      }
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () async {
+                if (titleController.text.isNotEmpty && selectedGroup != null) {
+                  await groupsRef.child(selectedGroup!).child('tasks').push().set({
+                    'title': titleController.text,
+                    'description': descController.text,
+                    'deadline': deadlineController.text,
+                    'deadlineTime': timeController.text,
+                    'status': 'Pending',
+                    'createdAt': DateTime.now().toIso8601String(),
+                  });
+                  if (ctx.mounted) Navigator.pop(ctx);
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskItem {
+  _TaskItem({
+    required this.id,
+    required this.groupCode,
+    required this.title,
+    required this.description,
+    required this.deadline,
+    required this.deadlineTime,
+    required this.status,
+    this.submission,
+    this.memberMarks,
+  });
+
+  final String id;
+  final String groupCode;
+  final String title;
+  final String description;
+  final String deadline;
+  final String deadlineTime;
+  final String status;
+  final String? submission;
+  final Map<String, dynamic>? memberMarks;
+}
+
+class _TaskCard extends StatefulWidget {
+  const _TaskCard({required this.task, required this.groupsRef});
+
+  final _TaskItem task;
+  final DatabaseReference groupsRef;
+
+  @override
+  State<_TaskCard> createState() => _TaskCardState();
+}
+
+class _TaskCardState extends State<_TaskCard> {
+  final Map<String, TextEditingController> _controllers = {};
+
+  @override
+  void dispose() {
+    for (var c in _controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isCompleted = widget.task.status == 'Completed';
+    final isVerified = widget.task.status == 'Verified';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: ExpansionTile(
+        leading: CircleAvatar(
+          backgroundColor: isVerified ? Colors.green[50] : (isCompleted ? Colors.orange[50] : Colors.grey[50]),
+          child: Icon(
+            isVerified ? Icons.check_circle : (isCompleted ? Icons.pending : Icons.assignment_outlined),
+            color: isVerified ? Colors.green : (isCompleted ? Colors.orange : Colors.grey),
+          ),
+        ),
+        title: Text(widget.task.title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF14375E))),
+        subtitle: Text('Group: ${widget.task.groupCode} • Due: ${widget.task.deadline} ${widget.task.deadlineTime}'),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Description:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Text(widget.task.description, style: const TextStyle(fontSize: 13)),
+                const Divider(height: 24),
+                if (widget.task.submission != null) ...[
+                  const Text('Group Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    width: double.infinity,
+                    decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8)),
+                    child: Text(widget.task.submission!, style: const TextStyle(fontSize: 13)),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                const Text('Individual Grading:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 12),
+                FutureBuilder<DataSnapshot>(
+                  future: widget.groupsRef.child(widget.task.groupCode).child('members').get(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const LinearProgressIndicator();
+                    }
+                    final members = snapshot.data?.value as Map?;
+                    if (members == null) return const Text('No members found.');
+
+                    final memberUids = members.keys.cast<String>().toList();
+                    final usersRef = FirebaseDatabase.instance.ref('users');
+
+                    return Column(
+                      children: memberUids.map((uid) {
+                        if (!_controllers.containsKey(uid)) {
+                          _controllers[uid] = TextEditingController(text: widget.task.memberMarks?[uid]?.toString() ?? '');
+                        }
+                        return FutureBuilder<DataSnapshot>(
+                          future: usersRef.child(uid).get(),
+                          builder: (context, userSnap) {
+                            String displayName = 'Loading...';
+                            String studentId = '...';
+                            if (userSnap.hasData && userSnap.data!.value is Map) {
+                              final userData = userSnap.data!.value as Map;
+                              displayName = userData['fullName'] ?? 'No Name';
+                              studentId = userData['studentId'] ?? 'No ID';
+                            }
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.person, size: 16, color: Color(0xFF1E6091)),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(displayName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                        Text('ID: $studentId', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 80,
+                                    child: TextField(
+                                      controller: _controllers[uid],
+                                      keyboardType: TextInputType.number,
+                                      textAlign: TextAlign.center,
+                                      decoration: const InputDecoration(
+                                        hintText: '0-100',
+                                        border: OutlineInputBorder(),
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                if (isCompleted || isVerified)
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => _updateTaskStatus('Verified'),
+                      style: FilledButton.styleFrom(backgroundColor: Colors.green),
+                      child: Text(isVerified ? 'Update All Marks' : 'Verify & Mark All'),
+                    ),
+                  )
+                else
+                  Text('Status: ${widget.task.status}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _updateTaskStatus(String status) async {
+    final Map<String, int> marksMap = {};
+    _controllers.forEach((uid, controller) {
+      if (controller.text.isNotEmpty) {
+        marksMap[uid] = int.tryParse(controller.text) ?? 0;
+      }
+    });
+
+    await widget.groupsRef.child(widget.task.groupCode).child('tasks').child(widget.task.id).update({
+      'status': status,
+      'memberMarks': marksMap,
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marks updated successfully')));
+    }
+  }
+}
+
+class _DocumentsReviewSection extends StatelessWidget {
+  const _DocumentsReviewSection({required this.supervisorUid, required this.groupsRef});
+
+  final String supervisorUid;
+  final DatabaseReference groupsRef;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DatabaseEvent>(
+      stream: groupsRef.onValue,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final data = snapshot.data?.snapshot.value;
+        if (data is! Map) return const Center(child: Text('No documents found.'));
+
+        final myGroups = Map<String, dynamic>.from(data).entries.where((e) {
+          final val = e.value;
+          return val is Map && val['supervisorId'] == supervisorUid;
+        }).toList();
+
+        final allDocs = <_DocItem>[];
+        for (final group in myGroups) {
+          final groupData = group.value as Map;
+          if (groupData['documents'] is Map) {
+            final docs = Map<String, dynamic>.from(groupData['documents']);
+            docs.forEach((id, val) {
+              if (val is Map) {
+                allDocs.add(_DocItem(
+                  id: id,
+                  groupCode: group.key,
+                  title: val['title'] ?? 'Untitled',
+                  description: val['description'] ?? '',
+                  type: val['type'] ?? 'File',
+                  downloadUrl: val['downloadUrl'],
+                ));
+              }
+            });
+          }
+        }
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('Documents Review', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 16),
+            if (allDocs.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No documents uploaded by groups yet.'))),
+            ...allDocs.map((d) => _DocCard(doc: d)).toList(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DocItem {
+  _DocItem({
+    required this.id,
+    required this.groupCode,
+    required this.title,
+    required this.description,
+    required this.type,
+    this.downloadUrl,
+  });
+
+  final String id;
+  final String groupCode;
+  final String title;
+  final String description;
+  final String type;
+  final String? downloadUrl;
+}
+
+class _DocCard extends StatelessWidget {
+  const _DocCard({required this.doc});
+
+  final _DocItem doc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        title: Text(doc.title),
+        subtitle: Text('${doc.groupCode} • ${doc.type}'),
+        trailing: doc.downloadUrl != null
+            ? IconButton(
+                icon: const Icon(Icons.download, color: Color(0xFF1E6091)),
+                onPressed: () async {
+                  final uri = Uri.parse(doc.downloadUrl!);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Could not open document')),
+                    );
+                  }
+                },
+              )
+            : null,
+      ),
+    );
+  }
+}
+
+class _CommentsSection extends StatelessWidget {
+  const _CommentsSection({required this.supervisorUid, required this.groupsRef});
+
+  final String supervisorUid;
+  final DatabaseReference groupsRef;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DatabaseEvent>(
+      stream: groupsRef.onValue,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final data = snapshot.data?.snapshot.value;
+        if (data is! Map) return const Center(child: Text('No feedback found.'));
+
+        final myGroupsFeedback = <Map<String, dynamic>>[];
+        final entries = Map<String, dynamic>.from(data);
+        
+        entries.forEach((groupCode, groupData) {
+          if (groupData is Map && groupData['supervisorId'] == supervisorUid) {
+            final title = groupData['projectTitle'] ?? 'Untitled Project';
+            // Add proposal remarks if exist
+            if (groupData['remarks'] != null && groupData['remarks'].toString().isNotEmpty) {
+              myGroupsFeedback.add({
+                'source': 'Proposal',
+                'projectTitle': title,
+                'content': groupData['remarks'],
+                'groupCode': groupCode,
+              });
+            }
+          }
+        });
+
+        if (myGroupsFeedback.isEmpty) {
+          return const Center(child: Text('No feedback or remarks have been sent yet.'));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: myGroupsFeedback.length,
+          itemBuilder: (context, index) {
+            final fb = myGroupsFeedback[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: const Color(0xFFEDF1F9),
+                  child: Icon(fb['source'] == 'Proposal' ? Icons.description : Icons.assignment, size: 20),
+                ),
+                title: Text(fb['projectTitle'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(fb['content'], style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                    const SizedBox(height: 4),
+                    Text('Type: ${fb['source']} | Group: ${fb['groupCode']}', style: const TextStyle(fontSize: 11)),
+                  ],
+                ),
+                isThreeLine: true,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _CommentItem {
+  _CommentItem(
+      {required this.id,
+      required this.content,
+      required this.submissionId});
+
+  final String id;
+  final String content;
+  final String submissionId;
+}
+
+class _CommentCard extends StatelessWidget {
+  const _CommentCard({required this.comment});
+
+  final _CommentItem comment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Submission: ${comment.submissionId}',
+                style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 8),
+            Text(comment.content,
+                style: Theme.of(context).textTheme.bodyMedium),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MeetingRequestsSection extends StatelessWidget {
+  const _MeetingRequestsSection({required this.supervisorUid, required this.groupsRef});
+
+  final String supervisorUid;
+  final DatabaseReference groupsRef;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DatabaseEvent>(
+      stream: groupsRef.onValue,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final data = snapshot.data?.snapshot.value;
+        if (data is! Map) return const Center(child: Text('No groups found.'));
+
+        final myGroups = Map<String, dynamic>.from(data).entries.where((e) {
+          final val = e.value;
+          return val is Map && val['supervisorId'] == supervisorUid;
+        }).toList();
+
+        final allMeetings = <_MeetingItem>[];
+        for (final group in myGroups) {
+          final groupData = group.value as Map;
+          if (groupData['meetings'] is Map) {
+            final meetings = Map<String, dynamic>.from(groupData['meetings']);
+            meetings.forEach((id, val) {
+              if (val is Map) {
+                allMeetings.add(_MeetingItem(
+                  id: id,
+                  groupCode: group.key,
+                  requestedDate: val['requestedDate'] ?? '',
+                  requestedTime: val['requestedTime'] ?? '',
+                  duration: val['duration'] ?? '',
+                  status: val['status'] ?? 'Pending',
+                  meetingLink: val['meetingLink'] ?? 'https://meet.google.com/new',
+                ));
+              }
+            });
+          }
+        }
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('Meeting Requests', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 16),
+            if (allMeetings.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No meeting requests yet.'))),
+            ...allMeetings.map((m) => _MeetingCard(meeting: m, groupsRef: groupsRef)).toList(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _MeetingItem {
+  _MeetingItem({
+    required this.id,
+    required this.groupCode,
+    required this.requestedDate,
+    required this.requestedTime,
+    required this.duration,
+    required this.status,
+    required this.meetingLink,
+  });
+
+  final String id;
+  final String groupCode;
+  final String requestedDate;
+  final String requestedTime;
+  final String duration;
+  final String status;
+  final String meetingLink;
+}
+
+class _MeetingCard extends StatelessWidget {
+  const _MeetingCard({required this.meeting, required this.groupsRef});
+
+  final _MeetingItem meeting;
+  final DatabaseReference groupsRef;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
                 Expanded(
-                  child: _SummaryCard(
-                    icon: Icons.event_available,
-                    label: 'Vivas',
-                    value: '2',
-                    color: colorScheme.secondary,
-                    onTap: () => Navigator.of(
-                      context,
-                    ).pushNamed(SupervisorProgressReportsScreen.routeName),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Group: ${meeting.groupCode}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF14375E))),
+                      const SizedBox(height: 4),
+                      Text('${meeting.requestedDate} at ${meeting.requestedTime}', style: TextStyle(color: Colors.grey[700], fontSize: 13)),
+                      Text('Duration: ${meeting.duration}', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: meeting.status == 'Pending' ? Colors.orange[50] : (meeting.status == 'Approved' ? Colors.green[50] : Colors.red[50]),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    meeting.status,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: meeting.status == 'Pending' ? Colors.orange[700] : (meeting.status == 'Approved' ? Colors.green[700] : Colors.red[700]),
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 15),
-            ListView.builder(
-              itemCount: _groups.length,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemBuilder: (context, index) {
-                final group = _groups[index];
-
-                return Card(
-                  elevation: 0,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: const BorderSide(color: Color(0xFFE6E6E6)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE8EEF6),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(group.project),
-                            ),
-                            const Spacer(),
-                            Icon(
-                              Icons.check_circle_outline,
-                              color: colorScheme.primary,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            const Icon(Icons.group, size: 18),
-                            const SizedBox(width: 6),
-                            Text(
-                              group.groupName.toUpperCase(),
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            _MemberAvatars(count: group.memberCount),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: LinearProgressIndicator(
-                                value: group.progress,
-                                minHeight: 6,
-                                borderRadius: BorderRadius.circular(999),
-                                backgroundColor: const Color(0xFFE8EEF6),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.arrow_forward_ios),
-                              onPressed: () {},
-                            ),
-                          ],
-                        ),
-                      ],
+            if (meeting.status == 'Pending') ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _updateStatus(context, 'Rejected'),
+                      style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                      child: const Text('Reject'),
                     ),
                   ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: const SupervisorNavBar(selectedIndex: 0),
-    );
-  }
-}
-
-class _GroupInfo {
-  const _GroupInfo(
-    this.groupName,
-    this.project,
-    this.progress,
-    this.memberCount,
-  );
-
-  final String groupName;
-  final String project;
-  final double progress;
-  final int memberCount;
-}
-
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Ink(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE6E6E6)),
-        ),
-        child: Column(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: color.withOpacity(0.12),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 4),
-            Text(label),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MemberAvatars extends StatelessWidget {
-  const _MemberAvatars({required this.count});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final items = List<int>.generate(count, (index) => index);
-
-    return SizedBox(
-      height: 28,
-      width: 28 + (items.length - 1) * 18,
-      child: Stack(
-        children: [
-          for (final index in items)
-            Positioned(
-              left: index * 18,
-              child: CircleAvatar(
-                radius: 14,
-                backgroundColor: const Color(0xFFE8EEF6),
-                child: Text(
-                  String.fromCharCode(65 + index),
-                  style: const TextStyle(fontSize: 11),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => _updateStatus(context, 'Approved'),
+                      style: FilledButton.styleFrom(backgroundColor: const Color(0xFF14375E)),
+                      child: const Text('Approve'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (meeting.status == 'Approved') ...[
+              const Divider(height: 32),
+              if (_isDeadlinePassed(meeting.requestedDate, meeting.requestedTime))
+                const Center(child: Text('Meeting link expired.', style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold)))
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      final url = Uri.parse(meeting.meetingLink);
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url);
+                      }
+                    },
+                    icon: const Icon(Icons.videocam),
+                    label: const Text('Join Video Meeting'),
+                    style: FilledButton.styleFrom(backgroundColor: Colors.green),
+                  ),
                 ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _isDeadlinePassed(String? dateStr, String? timeStr) {
+    if (dateStr == null || dateStr.isEmpty) return false;
+    try {
+      final date = DateTime.parse(dateStr);
+      int hour = 23;
+      int minute = 59;
+
+      if (timeStr != null && timeStr.isNotEmpty) {
+        final parts = timeStr.trim().split(' ');
+        final timeParts = parts[0].split(':');
+        hour = int.parse(timeParts[0]);
+        minute = int.parse(timeParts[1]);
+        if (parts.length > 1 && parts[1].toUpperCase() == 'PM' && hour < 12) {
+          hour += 12;
+        } else if (parts.length > 1 && parts[1].toUpperCase() == 'AM' && hour == 12) {
+          hour = 0;
+        }
+      }
+
+      final deadline = DateTime(date.year, date.month, date.day, hour, minute);
+      // 2 hours buffer for meetings
+      return DateTime.now().isAfter(deadline.add(const Duration(hours: 2)));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  void _updateStatus(BuildContext context, String status) async {
+    await groupsRef.child(meeting.groupCode).child('meetings').child(meeting.id).update({
+      'status': status,
+    });
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Meeting $status')));
+    }
+  }
+}
+
+class _ProgressMonitoringSection extends StatelessWidget {
+  const _ProgressMonitoringSection({required this.supervisorUid, required this.groupsRef});
+
+  final String supervisorUid;
+  final DatabaseReference groupsRef;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DatabaseEvent>(
+      stream: groupsRef.onValue,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final data = snapshot.data?.snapshot.value;
+        if (data is! Map) return const Center(child: Text('No groups found.'));
+
+        final myGroups = Map<String, dynamic>.from(data).entries.where((e) {
+          final val = e.value;
+          return val is Map && val['supervisorId'] == supervisorUid;
+        }).toList();
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('Progress Monitoring', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 16),
+            if (myGroups.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No assigned groups.'))),
+            ...myGroups.map((g) {
+              final groupData = g.value as Map;
+              final progress = groupData['progressPercentage'] ?? 0;
+              return _ProgressCard(
+                groupCode: g.key,
+                projectTitle: groupData['projectTitle'] ?? 'No Title',
+                percentage: progress is int ? progress : 0,
+              );
+            }).toList(),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ProgressCard extends StatelessWidget {
+  const _ProgressCard({required this.groupCode, required this.projectTitle, required this.percentage});
+
+  final String groupCode;
+  final String projectTitle;
+  final int percentage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(projectTitle, style: Theme.of(context).textTheme.titleSmall),
+            Text('Group: $groupCode', style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: percentage / 100,
+                minHeight: 8,
+                backgroundColor: Colors.grey[200],
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1E6091)),
               ),
             ),
+            const SizedBox(height: 8),
+            Text('$percentage% Complete', style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MarksRemarksSection extends StatelessWidget {
+  const _MarksRemarksSection({required this.supervisorUid, required this.groupsRef});
+
+  final String supervisorUid;
+  final DatabaseReference groupsRef;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DatabaseEvent>(
+      stream: groupsRef.onValue,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final data = snapshot.data?.snapshot.value;
+        if (data is! Map) return const Center(child: Text('No groups found.'));
+
+        final myGroups = Map<String, dynamic>.from(data).entries.where((e) {
+          final val = e.value;
+          return val is Map && val['supervisorId'] == supervisorUid;
+        }).toList();
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('Marks & Remarks', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 16),
+            if (myGroups.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No assigned groups.'))),
+            ...myGroups.map((g) {
+              final groupData = g.value as Map;
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(groupData['projectTitle'] ?? 'No Title', style: Theme.of(context).textTheme.titleSmall),
+                                Text('Group: ${g.key}', style: Theme.of(context).textTheme.bodySmall),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Color(0xFF1E6091)),
+                            onPressed: () => _showMarkDialog(context, g.key, groupData['marks'], groupData['remarks']),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Text('Current Marks: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text('${groupData['marks'] ?? 'Not set'}/100'),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('Remarks:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(groupData['remarks'] ?? 'No remarks yet.'),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showMarkDialog(BuildContext context, String groupCode, dynamic currentMarks, dynamic currentRemarks) {
+    final marksController = TextEditingController(text: currentMarks?.toString() ?? '');
+    final remarksController = TextEditingController(text: currentRemarks?.toString() ?? '');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Grade Group: $groupCode'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: marksController,
+                decoration: const InputDecoration(labelText: 'Marks (0-100)'),
+                keyboardType: TextInputType.number,
+              ),
+              TextField(
+                controller: remarksController,
+                decoration: const InputDecoration(labelText: 'Remarks'),
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () async {
+              await groupsRef.child(groupCode).update({
+                'marks': int.tryParse(marksController.text) ?? 0,
+                'remarks': remarksController.text,
+              });
+              if (context.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
         ],
       ),
     );
   }
 }
 
-class _WavyDivider extends StatelessWidget {
-  const _WavyDivider();
+class _DeadlinesSection extends StatelessWidget {
+  const _DeadlinesSection({required this.supervisorUid, required this.groupsRef});
+
+  final String supervisorUid;
+  final DatabaseReference groupsRef;
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _WavePainter(color: const Color(0xFF5F6C7B)),
-      size: const Size(double.infinity, 12),
+    return StreamBuilder<DatabaseEvent>(
+      stream: groupsRef.onValue,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final data = snapshot.data?.snapshot.value;
+        if (data is! Map) return const Center(child: Text('No groups found.'));
+
+        final myGroups = Map<String, dynamic>.from(data).entries.where((e) {
+          final val = e.value;
+          return val is Map && val['supervisorId'] == supervisorUid;
+        }).toList();
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('Project Deadlines', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 16),
+            if (myGroups.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No assigned groups.'))),
+            ...myGroups.map((g) {
+              final groupData = g.value as Map;
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  title: Text(groupData['projectTitle'] ?? 'No Title'),
+                  subtitle: Text('Proposal Deadline: ${groupData['proposalDeadline'] ?? 'Not set'}'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.calendar_month, color: Color(0xFF1E6091)),
+                    onPressed: () => _showDeadlineDialog(context, g.key),
+                  ),
+                ),
+              );
+            }).toList(),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeadlineDialog(BuildContext context, String groupCode) {
+    final dateController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Set Proposal Deadline for $groupCode'),
+        content: TextField(
+          controller: dateController,
+          decoration: const InputDecoration(labelText: 'Deadline (YYYY-MM-DD)'),
+          readOnly: true,
+          onTap: () async {
+            final d = await showDatePicker(
+              context: context,
+              initialDate: DateTime.now(),
+              firstDate: DateTime.now(),
+              lastDate: DateTime.now().add(const Duration(days: 180)),
+            );
+            if (d != null) dateController.text = d.toString().split(' ')[0];
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () async {
+              await groupsRef.child(groupCode).update({
+                'proposalDeadline': dateController.text,
+              });
+              if (context.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Set Deadline'),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _WavePainter extends CustomPainter {
-  _WavePainter({required this.color});
-
-  final Color color;
+class _SharedDocumentsSection extends StatelessWidget {
+  const _SharedDocumentsSection();
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-    final path = Path();
-    final waveHeight = size.height / 2;
+  Widget build(BuildContext context) {
+    final docsRef = FirebaseDatabase.instance.ref('documents_by_role/Supervisor');
+    return StreamBuilder<DatabaseEvent>(
+      stream: docsRef.onValue,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final data = snapshot.data?.snapshot.value;
+        if (data == null || data is! Map) {
+          return const Center(child: Text('No shared documents available for your role.'));
+        }
 
-    path.moveTo(0, waveHeight);
-    for (double x = 0; x <= size.width; x += 12) {
-      path.quadraticBezierTo(x + 6, waveHeight - 4, x + 12, waveHeight);
-    }
+        final docs = Map<String, dynamic>.from(data).entries.map((e) {
+          final val = Map<String, dynamic>.from(e.value as Map);
+          return {
+            'title': val['title'] ?? 'Untitled',
+            'fileName': val['fileName'] ?? '',
+            'fileUrl': val['fileUrl'] ?? val['downloadUrl'] ?? '',
+            'description': val['description'] ?? '',
+          };
+        }).toList();
 
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _WavePainter oldDelegate) {
-    return oldDelegate.color != color;
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final doc = docs[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFFE6E6E6)),
+              ),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFEDF1F9),
+                  child: Icon(Icons.description, color: Color(0xFF14375E)),
+                ),
+                title: Text(doc['title'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(doc['description'].isNotEmpty ? doc['description'] : doc['fileName']),
+                trailing: IconButton(
+                  icon: const Icon(Icons.open_in_new, color: Color(0xFF1E6091)),
+                  onPressed: () async {
+                    if (doc['fileUrl'].isNotEmpty) {
+                      final url = Uri.parse(doc['fileUrl']);
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Could not open document')),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }

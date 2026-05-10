@@ -57,8 +57,8 @@ class _ScheduleCard extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFFE8EEF6),
-          child: Icon(icon, color: const Color(0xFF1B1B1B)),
+          backgroundColor: const Color(0xFFEDF1F9),
+          child: Icon(icon, color: const Color(0xFF14375E)),
         ),
         title: Text(title),
         subtitle: Text(subtitle),

@@ -1,3 +1,4 @@
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 class AdminDeactivateAccountsScreen extends StatelessWidget {
@@ -7,6 +8,8 @@ class AdminDeactivateAccountsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final usersRef = FirebaseDatabase.instance.ref('users');
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Deactivate Accounts'),
@@ -15,42 +18,99 @@ class AdminDeactivateAccountsScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: const [
-          _DeactivateTile(name: 'Bilal Ahmed', role: 'Student'),
-          _DeactivateTile(name: 'Dr. Rehan', role: 'Supervisor'),
-        ],
-      ),
-    );
-  }
-}
+      body: StreamBuilder<DatabaseEvent>(
+        stream: usersRef.onValue,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final data = snapshot.data?.snapshot.value;
+          if (data is! Map) {
+            return const Center(child: Text('No users found.'));
+          }
+          final allUsers = Map<String, dynamic>.from(data);
+          // Show only active (non-admin, non-deactivated) users
+          final active = allUsers.entries.where((e) {
+            if (e.value is! Map) return false;
+            final u = Map<String, dynamic>.from(e.value as Map);
+            final status = (u['status'] as String?) ?? 'Active';
+            final role = (u['role'] as String?) ?? '';
+            return status != 'Deactivated' && role != 'Admin' && role != 'Pending';
+          }).toList();
 
-class _DeactivateTile extends StatelessWidget {
-  const _DeactivateTile({required this.name, required this.role});
+          if (active.isEmpty) {
+            return const Center(child: Text('No active accounts to deactivate.'));
+          }
 
-  final String name;
-  final String role;
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: active.length,
+            itemBuilder: (context, index) {
+              final uid = active[index].key;
+              final user = Map<String, dynamic>.from(active[index].value as Map);
+              final name = (user['displayName'] as String?) ??
+                  (user['email'] as String?) ?? uid;
+              final role = (user['role'] as String?) ?? '';
+              final email = (user['email'] as String?) ?? '';
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE6E6E6)),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFFE8EEF6),
-          child: Text(name.substring(0, 1)),
-        ),
-        title: Text(name),
-        subtitle: Text(role),
-        trailing: const Text('Deactivate'),
-        onTap: () {},
+              return Card(
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFFEDF1F9),
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                          color: Color(0xFF14375E), fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  title: Text(name,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(email.isNotEmpty ? '$role · $email' : role,
+                      style: const TextStyle(fontSize: 12)),
+                  trailing: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFDC2626),
+                      side: const BorderSide(color: Color(0xFFDC2626)),
+                    ),
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Deactivate Account?'),
+                          content:
+                              Text('This will block $name from signing in.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFFDC2626)),
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: const Text('Deactivate'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        await usersRef
+                            .child(uid)
+                            .update({'status': 'Deactivated'});
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('$name deactivated.')),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('Deactivate'),
+                  ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }

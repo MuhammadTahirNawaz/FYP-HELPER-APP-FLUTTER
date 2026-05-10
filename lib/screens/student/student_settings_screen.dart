@@ -4,6 +4,9 @@ import 'student_nav_bar.dart';
 import 'student_notifications_settings_screen.dart';
 import 'student_profile_screen.dart';
 import 'student_security_settings_screen.dart';
+import '../shared/messages_screen.dart';
+import '../auth/sign_out_screen.dart';
+import 'student_dashboard_screen.dart';
 
 class StudentSettingsScreen extends StatelessWidget {
   const StudentSettingsScreen({super.key});
@@ -12,14 +15,21 @@ class StudentSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).maybePop(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.of(context).pushReplacementNamed(StudentDashboardScreen.routeName);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Settings'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pushReplacementNamed(StudentDashboardScreen.routeName),
+          ),
         ),
-      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -46,9 +56,25 @@ class StudentSettingsScreen extends StatelessWidget {
               context,
             ).pushNamed(StudentSecuritySettingsScreen.routeName),
           ),
+          const SizedBox(height: 8),
+          Text(
+            'Account Management',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          _SettingsTile(
+            title: 'Sign Out or Delete Account',
+            subtitle: 'Sign out of your session or permanently delete your data.',
+            icon: Icons.logout,
+            onTap: () =>
+                Navigator.of(context).pushNamed(SignOutScreen.routeName),
+          ),
         ],
       ),
-      bottomNavigationBar: const StudentNavBar(selectedIndex: 3),
+      bottomNavigationBar: const StudentNavBar(selectedIndex: 4),
+      ),
     );
   }
 }
@@ -78,8 +104,8 @@ class _SettingsTile extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFFE8EEF6),
-          child: Icon(icon, color: const Color(0xFF1B1B1B)),
+          backgroundColor: const Color(0xFFEDF1F9),
+          child: Icon(icon, color: const Color(0xFF14375E)),
         ),
         title: Text(title),
         subtitle: Text(subtitle),

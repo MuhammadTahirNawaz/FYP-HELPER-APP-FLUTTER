@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../data/roles.dart';
+import '../../services/auth_service.dart';
+import 'sign_in_screen.dart';
 
 class SignOutScreen extends StatefulWidget {
   const SignOutScreen({super.key});
@@ -13,6 +15,92 @@ class SignOutScreen extends StatefulWidget {
 
 class _SignOutScreenState extends State<SignOutScreen> {
   String _selectedRole = kUserRoles.first;
+  final AuthService _authService = AuthService();
+  bool _isSubmitting = false;
+
+  Future<void> _handleSignOut() async {
+    if (_isSubmitting) {
+      return;
+    }
+    setState(() => _isSubmitting = true);
+    try {
+      await _authService.signOut();
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        SignInScreen.routeName,
+        (route) => false,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sign out failed: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  Future<void> _handleDeleteAccount() async {
+    if (_isSubmitting) {
+      return;
+    }
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Account'),
+        content: const Text(
+          'This action is permanent. All your data including groups, documents, and invitations will be deleted from the system. Are you sure?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    ) ?? false;
+
+    if (!confirmed) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      await _authService.deleteAccount();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account deleted successfully')),
+      );
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        SignInScreen.routeName,
+        (route) => false,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete failed: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +130,7 @@ class _SignOutScreenState extends State<SignOutScreen> {
                       style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1B1B1B),
+                            color: const Color(0xFF14375E),
                           ),
                       textAlign: TextAlign.center,
                     ),
@@ -50,7 +138,7 @@ class _SignOutScreenState extends State<SignOutScreen> {
                     Text(
                       'Confirm your role before signing out.',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: const Color(0xFF5F6C7B),
+                        color: const Color(0xFF6B7A99),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -70,7 +158,7 @@ class _SignOutScreenState extends State<SignOutScreen> {
                             Text(
                               'Current Role',
                               style: Theme.of(context).textTheme.labelLarge
-                                  ?.copyWith(color: const Color(0xFF1B1B1B)),
+                                  ?.copyWith(color: const Color(0xFF14375E)),
                             ),
                             const SizedBox(height: 8),
                             DropdownButtonFormField<String>(
@@ -120,7 +208,7 @@ class _SignOutScreenState extends State<SignOutScreen> {
                             ),
                             const SizedBox(height: 20),
                             FilledButton(
-                              onPressed: () {},
+                              onPressed: _handleSignOut,
                               style: FilledButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
@@ -130,7 +218,33 @@ class _SignOutScreenState extends State<SignOutScreen> {
                                 ),
                                 backgroundColor: const Color(0xFFB83280),
                               ),
-                              child: const Text('Confirm Sign Out'),
+                              child: _isSubmitting
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : const Text('Confirm Sign Out'),
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton.tonal(
+                              onPressed: _isSubmitting ? null : _handleDeleteAccount,
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                backgroundColor: Colors.red.shade100,
+                                foregroundColor: Colors.red.shade900,
+                              ),
+                              child: const Text('Delete Account'),
                             ),
                             const SizedBox(height: 12),
                             OutlinedButton(

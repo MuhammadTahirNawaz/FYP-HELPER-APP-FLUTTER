@@ -1,3 +1,4 @@
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 import 'admin_nav_bar.dart';
@@ -7,14 +8,18 @@ class DocSubmissionsScreen extends StatelessWidget {
 
   static const String routeName = '/admin-doc-submissions';
 
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'approved': return const Color(0xFF16A34A);
+      case 'pending': return const Color(0xFFF59E0B);
+      case 'needs review': return const Color(0xFFDC2626);
+      default: return const Color(0xFF6B7A99);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final submissions = [
-      _Submission('Proposal - Group A', 'Pending', Colors.orange),
-      _Submission('Report - Group B', 'Approved', Colors.green),
-      _Submission('SRS - Group C', 'Needs Review', Colors.redAccent),
-      _Submission('Demo Video - Group D', 'Approved', Colors.green),
-    ];
+    final docsRef = FirebaseDatabase.instance.ref('admin/documents');
 
     return Scaffold(
       appBar: AppBar(
@@ -24,57 +29,102 @@ class DocSubmissionsScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: submissions.length + 1,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return const Wrap(
-              spacing: 10,
-              runSpacing: 8,
-              children: [
-                _SummaryChip(label: '4 Pending'),
-                _SummaryChip(label: '2 Approved'),
-                _SummaryChip(label: '1 Needs Review'),
-              ],
-            );
+      body: StreamBuilder<DatabaseEvent>(
+        stream: docsRef.onValue,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final data = snapshot.data?.snapshot.value;
+          if (data is! Map) {
+            return const Center(child: Text('No submissions found.'));
           }
 
-          final submission = submissions[index - 1];
+          final docs = Map<String, dynamic>.from(data);
+          final entries = docs.entries
+              .where((e) => e.value is Map)
+              .toList()
+            ..sort((a, b) {
+              final aTs = ((a.value as Map)['updatedAt'] as int?) ?? 0;
+              final bTs = ((b.value as Map)['updatedAt'] as int?) ?? 0;
+              return bTs.compareTo(aTs);
+            });
 
-          return Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: Color(0xFFE6E6E6)),
-            ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 6,
-              ),
-              leading: const CircleAvatar(
-                backgroundColor: Color(0xFFE8EEF6),
-                child: Icon(Icons.description, color: Color(0xFF1B1B1B)),
-              ),
-              title: Text(submission.title),
-              subtitle: const Text('Updated today'),
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
+          // Count by status
+          final pending = entries.where((e) =>
+              ((e.value as Map)['status'] as String?)?.toLowerCase() == 'pending').length;
+          final approved = entries.where((e) =>
+              ((e.value as Map)['status'] as String?)?.toLowerCase() == 'approved').length;
+          final needsReview = entries.where((e) =>
+              ((e.value as Map)['status'] as String?)?.toLowerCase() == 'needs review').length;
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: entries.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    children: [
+                      if (pending > 0)
+                        _StatusChip(label: '$pending Pending', color: const Color(0xFFF59E0B)),
+                      if (approved > 0)
+                        _StatusChip(label: '$approved Approved', color: const Color(0xFF16A34A)),
+                      if (needsReview > 0)
+                        _StatusChip(label: '$needsReview Needs Review', color: const Color(0xFFDC2626)),
+                    ],
+                  ),
+                );
+              }
+
+              final id = entries[index - 1].key;
+              final doc = Map<String, dynamic>.from(entries[index - 1].value as Map);
+              final title = (doc['title'] as String?) ?? id;
+              final status = (doc['status'] as String?) ?? 'Pending';
+              final groupCode = (doc['groupCode'] as String?) ?? '';
+              final color = _statusColor(status);
+
+              return Card(
+                child: ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFFEDF1F9),
+                    child: Icon(Icons.description, color: Color(0xFF14375E)),
+                  ),
+                  title: Text(title,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(groupCode.isNotEmpty ? 'Group: $groupCode' : 'No group',
+                      style: const TextStyle(fontSize: 12)),
+                  trailing: PopupMenuButton<String>(
+                    initialValue: status,
+                    onSelected: (newStatus) async {
+                      await docsRef
+                          .child(id)
+                          .update({'status': newStatus, 'updatedAt': ServerValue.timestamp});
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'Pending', child: Text('Pending')),
+                      const PopupMenuItem(value: 'Approved', child: Text('Approved')),
+                      const PopupMenuItem(value: 'Needs Review', child: Text('Needs Review')),
+                    ],
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(status,
+                          style: TextStyle(
+                              color: color,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12)),
+                    ),
+                  ),
                 ),
-                decoration: BoxDecoration(
-                  color: submission.color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  submission.status,
-                  style: TextStyle(color: submission.color),
-                ),
-              ),
-            ),
+              );
+            },
           );
         },
       ),
@@ -83,28 +133,22 @@ class DocSubmissionsScreen extends StatelessWidget {
   }
 }
 
-class _Submission {
-  const _Submission(this.title, this.status, this.color);
-
-  final String title;
-  final String status;
-  final Color color;
-}
-
-class _SummaryChip extends StatelessWidget {
-  const _SummaryChip({required this.label});
-
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.label, required this.color});
   final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8EEF6),
+        color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Text(label),
+      child: Text(label,
+          style: TextStyle(
+              color: color, fontWeight: FontWeight.w600, fontSize: 12)),
     );
   }
 }

@@ -4,6 +4,9 @@ import 'supervisor_nav_bar.dart';
 import 'supervisor_notifications_settings_screen.dart';
 import 'supervisor_profile_screen.dart';
 import 'supervisor_security_settings_screen.dart';
+import '../shared/messages_screen.dart';
+import '../auth/sign_out_screen.dart';
+import 'supervisor_dashboard_screen.dart';
 
 class SupervisorSettingsScreen extends StatelessWidget {
   const SupervisorSettingsScreen({super.key});
@@ -12,14 +15,21 @@ class SupervisorSettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).maybePop(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.of(context).pushReplacementNamed(SupervisorDashboardScreen.routeName);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Settings'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pushReplacementNamed(SupervisorDashboardScreen.routeName),
+          ),
         ),
-      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -47,9 +57,25 @@ class SupervisorSettingsScreen extends StatelessWidget {
               context,
             ).pushNamed(SupervisorSecuritySettingsScreen.routeName),
           ),
+          const SizedBox(height: 8),
+          Text(
+            'Account Management',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          _SettingsTile(
+            title: 'Sign Out or Delete Account',
+            subtitle: 'Sign out of your session or permanently delete your data.',
+            icon: Icons.logout,
+            onTap: () =>
+                Navigator.of(context).pushNamed(SignOutScreen.routeName),
+          ),
         ],
       ),
       bottomNavigationBar: const SupervisorNavBar(selectedIndex: 3),
+      ),
     );
   }
 }
@@ -79,8 +105,8 @@ class _SettingsTile extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFFE8EEF6),
-          child: Icon(icon, color: const Color(0xFF1B1B1B)),
+          backgroundColor: const Color(0xFFEDF1F9),
+          child: Icon(icon, color: const Color(0xFF14375E)),
         ),
         title: Text(title),
         subtitle: Text(subtitle),

@@ -1,8 +1,8 @@
-import 'package:file_selector/file_selector.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'admin_nav_bar.dart';
+import 'admin_dashboard_screen.dart';
 
 class AdminReportsScreen extends StatefulWidget {
   const AdminReportsScreen({super.key});
@@ -14,298 +14,226 @@ class AdminReportsScreen extends StatefulWidget {
 }
 
 class _AdminReportsScreenState extends State<AdminReportsScreen> {
-  final TextEditingController _searchController = TextEditingController();
+  final DatabaseReference _reportsRef = FirebaseDatabase.instance.ref('admin/reports');
 
-  static const List<_ReportFile> _reports = [
-    _ReportFile(
-      title: 'Submission Summary',
-      period: 'Last 7 days',
-      fileName: 'submission_summary_week_17.pdf',
-      size: '1.2 MB',
-      downloadUrl: 'https://example.com/reports/submission_summary_week_17.pdf',
-      icon: Icons.assignment_turned_in,
-    ),
-    _ReportFile(
-      title: 'Supervisor Load',
-      period: 'Current semester',
-      fileName: 'supervisor_load_semester_1.xlsx',
-      size: '740 KB',
-      downloadUrl:
-          'https://example.com/reports/supervisor_load_semester_1.xlsx',
-      icon: Icons.bar_chart,
-    ),
-    _ReportFile(
-      title: 'Committee Reviews',
-      period: 'This month',
-      fileName: 'committee_reviews_april.pdf',
-      size: '560 KB',
-      downloadUrl: 'https://example.com/reports/committee_reviews_april.pdf',
-      icon: Icons.fact_check,
-    ),
-  ];
+  Future<void> _showEditor(BuildContext context, {_ReportEntry? entry}) async {
+    final titleController = TextEditingController(text: entry?.title ?? '');
+    final periodController = TextEditingController(text: entry?.period ?? '');
+    final ownerController = TextEditingController(text: entry?.owner ?? '');
+    final summaryController = TextEditingController(text: entry?.summary ?? '');
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  List<_ReportFile> _filterReports() {
-    final query = _searchController.text.trim().toLowerCase();
-    if (query.isEmpty) {
-      return _reports;
-    }
-
-    return _reports.where((report) {
-      return report.title.toLowerCase().contains(query) ||
-          report.period.toLowerCase().contains(query) ||
-          report.fileName.toLowerCase().contains(query);
-    }).toList();
-  }
-
-  Future<void> _handleDownload(_ReportFile report) async {
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Download Options',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                report.fileName,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: () async {
-                  final uri = Uri.parse(report.downloadUrl);
-                  final launched = await launchUrl(
-                    uri,
-                    mode: LaunchMode.externalApplication,
-                  );
-                  if (!mounted) {
-                    return;
-                  }
-                  Navigator.of(context).pop();
-                  _showSnack(
-                    launched
-                        ? 'Opening ${report.fileName} in browser.'
-                        : 'Unable to open download link.',
-                  );
-                },
-                icon: const Icon(Icons.link),
-                label: const Text('Open Download Link'),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final saveLocation = await getSaveLocation(
-                    suggestedName: report.fileName,
-                  );
-                  if (!mounted) {
-                    return;
-                  }
-                  Navigator.of(context).pop();
-                  if (saveLocation == null) {
-                    _showSnack('Download canceled.');
-                    return;
-                  }
-                  _showSnack('Saved to ${saveLocation.path}');
-                },
-                icon: const Icon(Icons.save_alt),
-                label: const Text('Choose Save Location'),
-              ),
-            ],
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(entry == null ? 'Add Report' : 'Edit Report'),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(labelText: 'Title'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: periodController,
+                  decoration: const InputDecoration(labelText: 'Period'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ownerController,
+                  decoration: const InputDecoration(labelText: 'Owner'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: summaryController,
+                  decoration: const InputDecoration(labelText: 'Summary'),
+                  maxLines: 4,
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final title = titleController.text.trim();
+                if (title.isEmpty) {
+                  return;
+                }
+                final payload = {
+                  'title': title,
+                  'period': periodController.text.trim(),
+                  'owner': ownerController.text.trim(),
+                  'summary': summaryController.text.trim(),
+                  'updatedAt': ServerValue.timestamp,
+                  if (entry == null) 'createdAt': ServerValue.timestamp,
+                };
+                if (entry == null) {
+                  await _reportsRef.push().set(payload);
+                } else {
+                  await _reportsRef.child(entry.id).update(payload);
+                }
+                if (!mounted) return;
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Save'),
+            ),
+          ],
         );
       },
     );
   }
 
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+  String _formatTimestamp(Object? ts) {
+    if (ts is int) {
+      final date = DateTime.fromMillisecondsSinceEpoch(ts);
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    }
+    return '';
   }
+
+  int _toIntTs(Object? ts) => ts is int ? ts : 0;
 
   @override
   Widget build(BuildContext context) {
-    final filteredReports = _filterReports();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reports'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            'Overview',
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.of(context).pushReplacementNamed(AdminDashboardScreen.routeName);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Reports'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pushReplacementNamed(AdminDashboardScreen.routeName),
           ),
-          const SizedBox(height: 12),
-          const Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              _StatChip(label: '3 Reports Available', icon: Icons.folder),
-              _StatChip(label: 'Last updated today', icon: Icons.schedule),
-            ],
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _searchController,
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Search reports by title or file name',
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (filteredReports.isEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              alignment: Alignment.center,
-              child: const Text('No reports match your search.'),
-            )
-          else
-            ...filteredReports.map(
-              (report) => _ReportCard(
-                report: report,
-                onDownload: () => _handleDownload(report),
-              ),
-            ),
-        ],
-      ),
-      bottomNavigationBar: const AdminNavBar(selectedIndex: 2),
-    );
-  }
-}
-
-class _ReportFile {
-  const _ReportFile({
-    required this.title,
-    required this.period,
-    required this.fileName,
-    required this.size,
-    required this.downloadUrl,
-    required this.icon,
-  });
-
-  final String title;
-  final String period;
-  final String fileName;
-  final String size;
-  final String downloadUrl;
-  final IconData icon;
-}
-
-class _ReportCard extends StatelessWidget {
-  const _ReportCard({required this.report, required this.onDownload});
-
-  final _ReportFile report;
-  final VoidCallback onDownload;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE6E6E6)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: const Color(0xFFE8EEF6),
-                  child: Icon(report.icon, color: colorScheme.primary),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        report.title,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(report.period),
-                    ],
-                  ),
-                ),
-                TextButton.icon(
-                  onPressed: onDownload,
-                  icon: const Icon(Icons.download),
-                  label: const Text('Download'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(report.fileName, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 4),
-            Text(
-              report.size,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: const Color(0xFF5F6C7B)),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: () => _showEditor(context),
+              tooltip: 'Add Report',
             ),
           ],
         ),
+        body: StreamBuilder<DatabaseEvent>(
+          stream: _reportsRef.onValue,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final entries = _ReportEntry.fromSnapshot(snapshot.data?.snapshot.value)
+              ..sort((a, b) => _toIntTs(b.createdAt).compareTo(_toIntTs(a.createdAt)));
+
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Text(
+                  'Firebase Reports',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                if (entries.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    alignment: Alignment.center,
+                    child: const Text('No reports available.'),
+                  )
+                else
+                  ...entries.map(
+                    (entry) => Card(
+                      elevation: 0,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: const BorderSide(color: Color(0xFFE6E6E6)),
+                      ),
+                      child: ListTile(
+                        title: Text(entry.title),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            if (entry.period.isNotEmpty)
+                              Text('Period: ${entry.period}'),
+                            if (entry.owner.isNotEmpty)
+                              Text('Owner: ${entry.owner}'),
+                            if (entry.summary.isNotEmpty) Text(entry.summary),
+                            if (entry.updatedAt != null)
+                              Text('Updated: ${_formatTimestamp(entry.updatedAt)}'),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => _showEditor(context, entry: entry),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () =>
+                                  _reportsRef.child(entry.id).remove(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+        bottomNavigationBar: const AdminNavBar(selectedIndex: 2),
       ),
     );
   }
 }
 
-class _StatChip extends StatelessWidget {
-  const _StatChip({required this.label, required this.icon});
+class _ReportEntry {
+  const _ReportEntry({
+    required this.id,
+    required this.title,
+    required this.period,
+    required this.owner,
+    required this.summary,
+    required this.createdAt,
+    required this.updatedAt,
+  });
 
-  final String label;
-  final IconData icon;
+  final String id;
+  final String title;
+  final String period;
+  final String owner;
+  final String summary;
+  final Object? createdAt;
+  final Object? updatedAt;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8EEF6),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: const Color(0xFF1B1B1B)),
-          const SizedBox(width: 6),
-          Text(label),
-        ],
-      ),
-    );
+  static List<_ReportEntry> fromSnapshot(Object? data) {
+    if (data is! Map) {
+      return <_ReportEntry>[];
+    }
+    final entries = Map<String, dynamic>.from(data);
+    return entries.entries.map((entry) {
+      final value = Map<String, dynamic>.from(entry.value as Map);
+      return _ReportEntry(
+        id: entry.key,
+        title: (value['title'] as String?) ?? '',
+        period: (value['period'] as String?) ?? '',
+        owner: (value['owner'] as String?) ?? '',
+        summary: (value['summary'] as String?) ?? '',
+        createdAt: value['createdAt'],
+        updatedAt: value['updatedAt'],
+      );
+    }).toList();
   }
 }

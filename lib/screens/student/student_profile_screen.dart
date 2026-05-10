@@ -1,9 +1,109 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-class StudentProfileScreen extends StatelessWidget {
+import '../../services/user_profile_service.dart';
+
+class StudentProfileScreen extends StatefulWidget {
   const StudentProfileScreen({super.key});
 
   static const String routeName = '/student-profile';
+
+  @override
+  State<StudentProfileScreen> createState() => _StudentProfileScreenState();
+}
+
+class _StudentProfileScreenState extends State<StudentProfileScreen> {
+  final UserProfileService _profileService = UserProfileService();
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _studentIdController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+
+  bool _isLoading = true;
+  bool _isSaving = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _studentIdController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() {
+        _errorMessage = 'Please sign in to load your profile.';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final profile = await _profileService.fetchProfile(user.uid);
+      _fullNameController.text = profile?.fullName ?? '';
+      _emailController.text = profile?.email.isNotEmpty == true
+          ? profile!.email
+          : (user.email ?? '');
+      _studentIdController.text = profile?.studentId ?? '';
+      _phoneController.text = profile?.phoneNumber ?? '';
+    } catch (error) {
+      _errorMessage = 'Failed to load profile: $error';
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    if (_isSaving) {
+      return;
+    }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in first.')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      await _profileService.updateProfile(
+        uid: user.uid,
+        fullName: _fullNameController.text.trim(),
+        studentId: _studentIdController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile saved.')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Save failed: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,56 +115,93 @@ class StudentProfileScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: Color(0xFFE6E6E6)),
-            ),
-            child: Padding(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Profile',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  const TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Full Name',
-                      hintText: 'Enter name',
+              children: [
+                if (_errorMessage != null)
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: Color(0xFFE6E6E6)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        _errorMessage!,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      hintText: 'student@university.edu',
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: const BorderSide(color: Color(0xFFE6E6E6)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Profile',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _fullNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Full Name',
+                            hintText: 'Enter name',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _emailController,
+                          enabled: false,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _studentIdController,
+                          decoration: const InputDecoration(
+                            labelText: 'Student ID',
+                            hintText: '2022-CS-001',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                            labelText: 'Phone Number (encrypted at rest)',
+                            hintText: '03xx-xxxxxxx',
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton(
+                          onPressed: _isSaving ? null : _saveProfile,
+                          child: _isSaving
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Save Changes'),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const TextField(
-                    decoration: InputDecoration(
-                      labelText: 'Student ID',
-                      hintText: '2022-CS-001',
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: () {},
-                    child: const Text('Save Changes'),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }

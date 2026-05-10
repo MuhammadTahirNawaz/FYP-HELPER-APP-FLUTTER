@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'admin_committee_management_screen.dart';
+import 'admin_group_records_screen.dart';
 import 'admin_nav_bar.dart';
 import 'admin_supervisor_management_screen.dart';
 import 'admin_user_management_screen.dart';
+import 'admin_dashboard_screen.dart';
 
 class AdminManagementScreen extends StatelessWidget {
   const AdminManagementScreen({super.key});
@@ -12,14 +14,21 @@ class AdminManagementScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Management'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).maybePop(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.of(context).pushReplacementNamed(AdminDashboardScreen.routeName);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Management'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pushReplacementNamed(AdminDashboardScreen.routeName),
+          ),
         ),
-      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -54,9 +63,18 @@ class AdminManagementScreen extends StatelessWidget {
               context,
             ).pushNamed(AdminCommitteeManagementScreen.routeName),
           ),
+          _ManagementCard(
+            title: 'Group Records',
+            subtitle: 'View detailed group info and export PDF.',
+            icon: Icons.assignment,
+            onTap: () => Navigator.of(
+              context,
+            ).pushNamed(AdminGroupRecordsScreen.routeName),
+          ),
         ],
       ),
       bottomNavigationBar: const AdminNavBar(selectedIndex: 1),
+      ),
     );
   }
 }
@@ -86,8 +104,8 @@ class _ManagementCard extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFFE8EEF6),
-          child: Icon(icon, color: const Color(0xFF1B1B1B)),
+          backgroundColor: const Color(0xFFEDF1F9),
+          child: Icon(icon, color: const Color(0xFF14375E)),
         ),
         title: Text(title),
         subtitle: Text(subtitle),

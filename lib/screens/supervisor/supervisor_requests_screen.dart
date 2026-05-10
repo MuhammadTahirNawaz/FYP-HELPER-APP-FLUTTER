@@ -1,132 +1,200 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 import 'supervisor_nav_bar.dart';
 import 'supervisor_profile_screen.dart';
+import 'supervisor_dashboard_screen.dart';
 
-class SupervisorRequestsScreen extends StatelessWidget {
+class SupervisorRequestsScreen extends StatefulWidget {
   const SupervisorRequestsScreen({super.key});
 
   static const String routeName = '/supervisor-requests';
 
-  static const List<_RequestGroup> _requests = [
-    _RequestGroup(
-      groupName: 'Group Delta',
-      projectName: 'Smart Attendance',
-      sentLabel: 'Sent 2 hrs ago',
-      students: ['Student 1', 'Student 2', 'Student 3', 'Student 4'],
-    ),
-    _RequestGroup(
-      groupName: 'Group Alpha',
-      projectName: 'AI Tutor',
-      sentLabel: 'Sent 1 hr ago',
-      students: ['Student 1', 'Student 2', 'Student 3'],
-    ),
-    _RequestGroup(
-      groupName: 'Group Gamma',
-      projectName: 'Lab Scheduler',
-      sentLabel: 'Sent 30 mins ago',
-      students: [
-        'Student 1',
-        'Student 2',
-        'Student 3',
-        'Student 4',
-        'Student 5',
-      ],
-    ),
-  ];
+  @override
+  State<SupervisorRequestsScreen> createState() => _SupervisorRequestsScreenState();
+}
+
+class _SupervisorRequestsScreenState extends State<SupervisorRequestsScreen> {
+  late String _supervisorUid;
+  final DatabaseReference _groupsRef = FirebaseDatabase.instance.ref('groups');
+
+  @override
+  void initState() {
+    super.initState();
+    _supervisorUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.notifications_none),
-          onPressed: () {},
-          tooltip: 'Notifications',
-        ),
-        title: const Text('FYP Portal'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            onPressed: () => Navigator.of(
-              context,
-            ).pushNamed(SupervisorProfileScreen.routeName),
-            tooltip: 'Profile',
+    final supervisorRef = FirebaseDatabase.instance.ref('supervisor').child(_supervisorUid);
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.of(context).pushReplacementNamed(SupervisorDashboardScreen.routeName);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pushReplacementNamed(SupervisorDashboardScreen.routeName),
+            tooltip: 'Back to Dashboard',
           ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: Color(0xFFE6E6E6)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Text(
-                      'SUPERVISION REQUESTS',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    const SizedBox(height: 12, child: _WavyDivider()),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${_requests.length} PENDING REQUESTS',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 15),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _requests.length,
-                itemBuilder: (context, index) {
-                  final request = _requests[index];
-                  return _RequestCard(request: request);
-                },
-              ),
+          title: const Text('FYP Portal'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.person_outline),
+              onPressed: () => Navigator.of(context).pushNamed(SupervisorProfileScreen.routeName),
+              tooltip: 'Profile',
             ),
           ],
         ),
+        body: StreamBuilder<DatabaseEvent>(
+          stream: supervisorRef.child('requests').onValue,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final data = snapshot.data?.snapshot.value;
+            final requestsMap = data is Map ? Map<String, dynamic>.from(data) : {};
+            final pendingRequests = requestsMap.entries
+                .where((e) => e.value['status'] == 'Pending')
+                .toList();
+
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: Color(0xFFE6E6E6)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Text(
+                            'SUPERVISION REQUESTS',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          const SizedBox(height: 12, child: _WavyDivider()),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${pendingRequests.length} PENDING REQUESTS',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  if (pendingRequests.isEmpty)
+                    const Expanded(child: Center(child: Text('No pending requests found.')))
+                  else
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: pendingRequests.length,
+                        itemBuilder: (context, index) {
+                          final entry = pendingRequests[index];
+                          final requestData = Map<String, dynamic>.from(entry.value as Map);
+                          return _RequestCard(
+                            requestId: entry.key,
+                            requestData: requestData,
+                            supervisorRef: supervisorRef,
+                            groupsRef: _groupsRef,
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+        bottomNavigationBar: const SupervisorNavBar(selectedIndex: 1),
       ),
-      bottomNavigationBar: const SupervisorNavBar(selectedIndex: 1),
     );
   }
 }
 
-class _RequestGroup {
-  const _RequestGroup({
-    required this.groupName,
-    required this.projectName,
-    required this.sentLabel,
-    required this.students,
+class _RequestCard extends StatefulWidget {
+  const _RequestCard({
+    required this.requestId,
+    required this.requestData,
+    required this.supervisorRef,
+    required this.groupsRef,
   });
 
-  final String groupName;
-  final String projectName;
-  final String sentLabel;
-  final List<String> students;
+  final String requestId;
+  final Map<String, dynamic> requestData;
+  final DatabaseReference supervisorRef;
+  final DatabaseReference groupsRef;
+
+  @override
+  State<_RequestCard> createState() => _RequestCardState();
 }
 
-class _RequestCard extends StatelessWidget {
-  const _RequestCard({required this.request});
+class _RequestCardState extends State<_RequestCard> {
+  bool _processing = false;
 
-  final _RequestGroup request;
+  Future<void> _handleAction(bool accept) async {
+    setState(() => _processing = true);
+    try {
+      final status = accept ? 'Accepted' : 'Rejected';
+      final studentId = widget.requestData['studentId'];
+      final groupCode = widget.requestData['groupCode'];
+
+      // 1. Update request status
+      await widget.supervisorRef.child('requests').child(widget.requestId).update({
+        'status': status,
+        'respondedAt': ServerValue.timestamp,
+      });
+
+      // 2. If accepted, link supervisor to group and vice versa
+      if (accept && groupCode != null) {
+        await widget.groupsRef.child(groupCode).update({
+          'supervisorId': FirebaseAuth.instance.currentUser?.uid,
+          'supervisorName': FirebaseAuth.instance.currentUser?.displayName ?? 'Supervisor',
+          'status': 'Under Supervision',
+        });
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Request $status')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _processing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final groupName = widget.requestData['groupName'] ?? 'No Group Name';
+    final projectName = widget.requestData['projectName'] ?? 'No Project Title';
+    final timestamp = widget.requestData['timestamp'];
+    final students = widget.requestData['studentName'] != null 
+        ? [widget.requestData['studentName'] as String] 
+        : ['Unknown Student'];
+
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 12),
@@ -142,59 +210,44 @@ class _RequestCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  request.groupName.toUpperCase(),
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                  groupName.toUpperCase(),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 const Spacer(),
-                Text(
-                  request.sentLabel,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF5F6C7B),
+                if (timestamp != null)
+                  Text(
+                    'Recent', // Ideally format timestamp
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFF6B7A99),
+                        ),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              request.projectName,
+              projectName,
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: request.students
-                  .map((student) => _StudentAvatar(name: student))
-                  .toList(),
+              children: students.map((name) => _StudentAvatar(name: name)).toList(),
             ),
             const SizedBox(height: 15),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Accepted ${request.groupName}'),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.check),
+                    onPressed: _processing ? null : () => _handleAction(true),
+                    icon: _processing ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.check),
                     label: const Text('ACCEPT'),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Rejected ${request.groupName}'),
-                        ),
-                      );
-                    },
+                    onPressed: _processing ? null : () => _handleAction(false),
                     icon: const Icon(Icons.close),
                     label: const Text('REJECT'),
                   ),
@@ -220,7 +273,7 @@ class _StudentAvatar extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 18,
-          backgroundColor: const Color(0xFFE8EEF6),
+          backgroundColor: const Color(0xFFEDF1F9),
           child: Text(
             name.substring(0, 1),
             style: const TextStyle(fontSize: 12),
@@ -239,7 +292,7 @@ class _WavyDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: _WavePainter(color: const Color(0xFF5F6C7B)),
+      painter: _WavePainter(color: const Color(0xFF6B7A99)),
       size: const Size(double.infinity, 12),
     );
   }
