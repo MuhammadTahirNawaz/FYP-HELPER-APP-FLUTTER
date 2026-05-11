@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import 'student_nav_bar.dart';
 import 'student_notifications_settings_screen.dart';
@@ -73,7 +74,7 @@ class StudentSettingsScreen extends StatelessWidget {
           ),
         ],
       ),
-      bottomNavigationBar: const StudentNavBar(selectedIndex: 4),
+      bottomNavigationBar: const StudentNavBar(selectedIndex: 3),
       ),
     );
   }
@@ -104,7 +105,7 @@ class _SettingsTile extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFFEDF1F9),
+          backgroundColor: AppColors.selectedTile,
           child: Icon(icon, color: const Color(0xFF14375E)),
         ),
         title: Text(title),
@@ -115,3 +116,4 @@ class _SettingsTile extends StatelessWidget {
     );
   }
 }
+

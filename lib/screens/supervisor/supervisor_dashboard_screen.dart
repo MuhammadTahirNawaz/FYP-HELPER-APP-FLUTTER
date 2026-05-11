@@ -3,8 +3,9 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/crypto_service.dart';
-import '../shared/messages_screen.dart';
 import 'supervisor_nav_bar.dart';
+import '../../utils/download_helper.dart';
+import '../../theme/app_colors.dart';
 
 enum _SupervisorSection {
   dashboard,
@@ -33,11 +34,24 @@ class SupervisorDashboardScreen extends StatefulWidget {
 class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
   _SupervisorSection _currentSection = _SupervisorSection.dashboard;
   late String _supervisorUid;
-
+  String? _university;
+  
   @override
   void initState() {
     super.initState();
     _supervisorUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    _fetchUniversity();
+  }
+
+  Future<void> _fetchUniversity() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final snap = await FirebaseDatabase.instance.ref('users/${user.uid}').get();
+      if (snap.exists && snap.value is Map) {
+        final data = Map<String, dynamic>.from(snap.value as Map);
+        if (mounted) setState(() => _university = data['university'] as String?);
+      }
+    }
   }
 
   String _sectionTitle(_SupervisorSection section) {
@@ -62,7 +76,7 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
       appBar: AppBar(
         elevation: 0,
         centerTitle: false,
-        backgroundColor: const Color(0xFF14375E),
+        backgroundColor: AppColors.black,
         foregroundColor: Colors.white,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,11 +103,11 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
           const SizedBox(width: 8),
         ],
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF14375E), Color(0xFF1E6091)],
+              colors: [AppColors.black, Theme.of(context).colorScheme.primary],
             ),
           ),
         ),
@@ -131,29 +145,64 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
           supervisorUid: _supervisorUid,
           groupsRef: groupsRef,
           supervisorRef: supervisorRef,
+          university: _university,
         );
       case _SupervisorSection.groups:
         return _AssignedGroupsSection(
-            supervisorUid: _supervisorUid, groupsRef: groupsRef);
+          supervisorUid: _supervisorUid,
+          groupsRef: groupsRef,
+          university: _university,
+        );
       case _SupervisorSection.proposals:
         return _ProposalsReviewSection(
-            supervisorUid: _supervisorUid, groupsRef: groupsRef);
+          supervisorUid: _supervisorUid,
+          groupsRef: groupsRef,
+          university: _university,
+        );
       case _SupervisorSection.tasks:
-        return _TasksSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+        return _TasksSection(
+          supervisorUid: _supervisorUid,
+          groupsRef: groupsRef,
+          university: _university,
+        );
       case _SupervisorSection.documents:
-        return _DocumentsReviewSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+        return _DocumentsReviewSection(
+          supervisorUid: _supervisorUid,
+          groupsRef: groupsRef,
+          university: _university,
+        );
       case _SupervisorSection.comments:
-        return _CommentsSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+        return _CommentsSection(
+          supervisorUid: _supervisorUid,
+          groupsRef: groupsRef,
+          university: _university,
+        );
       case _SupervisorSection.meetings:
-        return _MeetingRequestsSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+        return _MeetingRequestsSection(
+          supervisorUid: _supervisorUid,
+          groupsRef: groupsRef,
+          university: _university,
+        );
       case _SupervisorSection.progress:
-        return _ProgressMonitoringSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+        return _ProgressMonitoringSection(
+          supervisorUid: _supervisorUid,
+          groupsRef: groupsRef,
+          university: _university,
+        );
       case _SupervisorSection.marks:
-        return _MarksRemarksSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+        return _MarksRemarksSection(
+          supervisorUid: _supervisorUid,
+          groupsRef: groupsRef,
+          university: _university,
+        );
       case _SupervisorSection.deadlines:
-        return _DeadlinesSection(supervisorUid: _supervisorUid, groupsRef: groupsRef);
+        return _DeadlinesSection(
+          supervisorUid: _supervisorUid,
+          groupsRef: groupsRef,
+          university: _university,
+        );
       case _SupervisorSection.sharedDocuments:
-        return const _SharedDocumentsSection();
+        return _SharedDocumentsSection(university: _university);
     }
   }
 }
@@ -174,11 +223,11 @@ class _SupervisorDrawer extends StatelessWidget {
         padding: EdgeInsets.zero,
         children: [
           DrawerHeader(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF14375E), Color(0xFF1E6091)],
+                colors: [AppColors.black, Theme.of(context).colorScheme.primary],
               ),
             ),
             child: Align(
@@ -191,7 +240,7 @@ class _SupervisorDrawer extends StatelessWidget {
                     radius: 22,
                     backgroundColor: Colors.white,
                     child: Icon(Icons.supervisor_account,
-                        color: Color(0xFF14375E)),
+                        color: AppColors.black),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -245,17 +294,17 @@ class _SupervisorDrawer extends StatelessWidget {
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       tileColor:
-          isSelected ? const Color(0xFFEDF1F9) : Colors.transparent,
+          isSelected ? AppColors.selectedTile : Colors.transparent,
       leading: Icon(icon,
           color: isSelected
-              ? const Color(0xFF1E6091)
-              : const Color(0xFF6B7A99)),
+              ? Theme.of(context).colorScheme.primary
+              : AppColors.slateText),
       title: Text(
         label,
         style: TextStyle(
           color: isSelected
-              ? const Color(0xFF14375E)
-              : const Color(0xFF6B7A99),
+              ? AppColors.black
+              : AppColors.slateText,
           fontWeight:
               isSelected ? FontWeight.w700 : FontWeight.w500,
         ),
@@ -271,11 +320,13 @@ class _SupervisorDashboardHome extends StatelessWidget {
     required this.supervisorUid,
     required this.groupsRef,
     required this.supervisorRef,
+    this.university,
   });
 
   final String supervisorUid;
   final DatabaseReference groupsRef;
   final DatabaseReference supervisorRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -285,7 +336,13 @@ class _SupervisorDashboardHome extends StatelessWidget {
         final allGroups = groupsSnapshot.data?.snapshot.value is Map
             ? Map<String, dynamic>.from(groupsSnapshot.data!.snapshot.value as Map)
             : {};
-        final myGroups = allGroups.values.where((g) => g is Map && g['supervisorId'] == supervisorUid).toList();
+            
+        // Filter by University
+        final filteredGroups = university == null 
+          ? allGroups 
+          : Map.fromEntries(allGroups.entries.where((e) => (e.value as Map)['university'] == university));
+
+        final myGroups = filteredGroups.values.where((g) => g is Map && g['supervisorId'] == supervisorUid).toList();
         final assignedGroupsCount = myGroups.length;
 
         return StreamBuilder<DatabaseEvent>(
@@ -318,7 +375,7 @@ class _SupervisorDashboardHome extends StatelessWidget {
                   Text(
                     'UPCOMING VIVAS',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: const Color(0xFF64748B),
+                        color: AppColors.caption,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1.1,
                         ),
@@ -330,12 +387,12 @@ class _SupervisorDashboardHome extends StatelessWidget {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF14375E), Color(0xFF1E6091)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                          decoration: BoxDecoration(
+                           gradient: LinearGradient(
+                             colors: [AppColors.black, Theme.of(context).colorScheme.primary],
+                             begin: Alignment.topLeft,
+                             end: Alignment.bottomRight,
+                           ),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
@@ -388,10 +445,10 @@ class _SupervisorDashboardHome extends StatelessWidget {
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
                   children: [
-                    _StatCard(title: 'Assigned Groups', value: assignedGroupsCount.toString(), icon: Icons.group, color: const Color(0xFF1E6091)),
-                    _StatCard(title: 'Pending Requests', value: pendingRequestsCount.toString(), icon: Icons.pending_actions, color: const Color(0xFFF59E0B)),
-                    _StatCard(title: 'Active Tasks', value: activeTasksCount.toString(), icon: Icons.assignment_turned_in, color: const Color(0xFF10B981)),
-                    _StatCard(title: 'Pending Grades', value: pendingGradesCount.toString(), icon: Icons.grade, color: const Color(0xFF6366F1)),
+                       _StatCard(title: 'Assigned Groups', value: assignedGroupsCount.toString(), icon: Icons.group, color: Theme.of(context).colorScheme.primary),
+                    _StatCard(title: 'Pending Requests', value: pendingRequestsCount.toString(), icon: Icons.pending_actions, color: AppColors.warning),
+                    _StatCard(title: 'Active Tasks', value: activeTasksCount.toString(), icon: Icons.assignment_turned_in, color: AppColors.success),
+                    _StatCard(title: 'Pending Grades', value: pendingGradesCount.toString(), icon: Icons.grade, color: AppColors.primaryIndigo),
                   ],
                 ),
               ],
@@ -424,9 +481,9 @@ class _StatCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [color.withOpacity(0.16), Colors.white],
+          colors: [color.withValues(alpha: 0.16), Colors.white],
         ),
-        border: Border.all(color: color.withOpacity(0.12)),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -436,7 +493,7 @@ class _StatCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor: color.withOpacity(0.14),
+              backgroundColor: color.withValues(alpha: 0.14),
               child: Icon(icon, size: 20, color: color),
             ),
             const SizedBox(height: 12),
@@ -444,14 +501,14 @@ class _StatCard extends StatelessWidget {
               value,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF14375E),
+                    color: AppColors.black,
                   ),
             ),
             const SizedBox(height: 4),
             Text(
               title,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF6B7A99),
+                    color: AppColors.slateText,
                     fontWeight: FontWeight.w600,
                   ),
               textAlign: TextAlign.left,
@@ -480,17 +537,17 @@ class _SectionBanner extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF14375E), Color(0xFF1E6091)],
+          colors: [AppColors.black, Theme.of(context).colorScheme.primary],
         ),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: Colors.white.withOpacity(0.16),
+            backgroundColor: Colors.white.withValues(alpha: 0.16),
             child: Icon(icon, color: Colors.white),
           ),
           const SizedBox(width: 16),
@@ -667,10 +724,11 @@ class _RequestCard extends StatelessWidget {
 
 class _AssignedGroupsSection extends StatelessWidget {
   const _AssignedGroupsSection(
-      {required this.supervisorUid, required this.groupsRef});
+      {required this.supervisorUid, required this.groupsRef, this.university});
 
   final String supervisorUid;
   final DatabaseReference groupsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -684,7 +742,13 @@ class _AssignedGroupsSection extends StatelessWidget {
         if (data is! Map) {
           return const Center(child: Text('No groups assigned.'));
         }
-        final entries = Map<String, dynamic>.from(data);
+        final allEntries = Map<String, dynamic>.from(data);
+        
+        // Filter by University
+        final entries = university == null 
+          ? allEntries 
+          : Map.fromEntries(allEntries.entries.where((e) => (e.value as Map)['university'] == university));
+
         final assignedGroups = entries.entries
             .where((e) =>
                 e.value is Map &&
@@ -757,11 +821,11 @@ class _GroupItemCard extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Text('Code: ${group.code}', style: const TextStyle(color: Color(0xFF1E6091), fontWeight: FontWeight.bold)),
+                  Text('Code: ${group.code}', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
                   const Spacer(),
                   Chip(
                     label: Text(group.status, style: const TextStyle(fontSize: 10)),
-                    backgroundColor: const Color(0xFFEEF2FF),
+                    backgroundColor: AppColors.chipBg,
                   ),
                 ],
               ),
@@ -801,14 +865,14 @@ class _GroupItemCard extends StatelessWidget {
                       children: [
                         Text(group.projectTitle, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
                         const SizedBox(height: 4),
-                        Text('Group Code: ${group.code}', style: const TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.w500)),
+                        Text('Group Code: ${group.code}', style: const TextStyle(color: AppColors.infoBlue, fontWeight: FontWeight.w500)),
                       ],
                     ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(20)),
-                    child: Text(group.status, style: const TextStyle(color: Color(0xFF4F46E5), fontSize: 12, fontWeight: FontWeight.bold)),
+                    decoration: BoxDecoration(color: AppColors.chipBg, borderRadius: BorderRadius.circular(20)),
+                    child: Text(group.status, style: const TextStyle(color: AppColors.infoIndigo, fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -844,14 +908,14 @@ class _GroupItemCard extends StatelessWidget {
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
+                          color: AppColors.cardSoft,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          border: Border.all(color: AppColors.borderSoft),
                         ),
                         child: ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                           leading: CircleAvatar(
-                            backgroundColor: const Color(0xFF3B82F6),
+                            backgroundColor: AppColors.infoBlue,
                             child: Text(name[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
                           ),
                           title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -860,7 +924,7 @@ class _GroupItemCard extends StatelessWidget {
                             children: [
                               Text('ID: $studentId', style: const TextStyle(fontSize: 12)),
                               if (phone != null)
-                                Text('Phone: $phone', style: const TextStyle(fontSize: 12, color: Color(0xFF3B82F6), fontWeight: FontWeight.w500)),
+                                Text('Phone: $phone', style: const TextStyle(fontSize: 12, color: AppColors.infoBlue, fontWeight: FontWeight.w500)),
                             ],
                           ),
                           trailing: phone != null
@@ -887,10 +951,11 @@ class _GroupItemCard extends StatelessWidget {
 
 class _ProposalsReviewSection extends StatelessWidget {
   const _ProposalsReviewSection(
-      {required this.supervisorUid, required this.groupsRef});
+      {required this.supervisorUid, required this.groupsRef, this.university});
 
   final String supervisorUid;
   final DatabaseReference groupsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -904,7 +969,13 @@ class _ProposalsReviewSection extends StatelessWidget {
         if (data is! Map) {
           return const Center(child: Text('No proposals found.'));
         }
-        final entries = Map<String, dynamic>.from(data);
+        final allEntries = Map<String, dynamic>.from(data);
+        
+        // Filter by University
+        final entries = university == null 
+          ? allEntries 
+          : Map.fromEntries(allEntries.entries.where((e) => (e.value as Map)['university'] == university));
+
         final proposals = entries.entries
             .where((e) =>
                 e.value is Map &&
@@ -1014,11 +1085,10 @@ class _ProposalCardState extends State<_ProposalCard> {
       if (await canLaunchUrl(url)) {
         await launchUrl(url);
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open proposal document.')),
-          );
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open proposal document.')),
+        );
       }
     }
   }
@@ -1175,10 +1245,11 @@ class _ProposalCardState extends State<_ProposalCard> {
 }
 
 class _TasksSection extends StatelessWidget {
-  const _TasksSection({required this.supervisorUid, required this.groupsRef});
+  const _TasksSection({required this.supervisorUid, required this.groupsRef, this.university});
 
   final String supervisorUid;
   final DatabaseReference groupsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -1191,7 +1262,14 @@ class _TasksSection extends StatelessWidget {
         final data = snapshot.data?.snapshot.value;
         if (data is! Map) return const Center(child: Text('No groups found.'));
 
-        final myGroups = Map<String, dynamic>.from(data).entries.where((e) {
+        final allEntries = Map<String, dynamic>.from(data);
+        
+        // Filter by University
+        final entries = university == null 
+          ? allEntries 
+          : Map.fromEntries(allEntries.entries.where((e) => (e.value as Map)['university'] == university));
+
+        final myGroups = entries.entries.where((e) {
           final val = e.value;
           return val is Map && val['supervisorId'] == supervisorUid;
         }).toList();
@@ -1231,14 +1309,14 @@ class _TasksSection extends StatelessWidget {
                     onPressed: () => _showCreateTaskDialog(context, myGroups),
                     icon: const Icon(Icons.add),
                     label: const Text('Add'),
-                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF14375E)),
+                    style: FilledButton.styleFrom(backgroundColor: AppColors.black),
                   ),
               ],
             ),
             const SizedBox(height: 16),
             if (allTasks.isEmpty)
               const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No tasks created yet.'))),
-            ...allTasks.map((t) => _TaskCard(task: t, groupsRef: groupsRef)).toList(),
+            ...allTasks.map((t) => _TaskCard(task: t, groupsRef: groupsRef)),
           ],
         );
       },
@@ -1262,15 +1340,16 @@ class _TasksSection extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: selectedGroup,
+                  initialValue: selectedGroup,
                   items: groups.map((g) => DropdownMenuItem(value: g.key, child: Text(g.key))).toList(),
                   onChanged: (v) => setDialogState(() => selectedGroup = v),
                   decoration: const InputDecoration(labelText: 'Target Group'),
                 ),
-                TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Task Title')),
-                TextField(controller: descController, decoration: const InputDecoration(labelText: 'Description')),
+                TextField(controller: titleController, style: const TextStyle(fontWeight: FontWeight.normal), decoration: const InputDecoration(labelText: 'Task Title')),
+                TextField(controller: descController, style: const TextStyle(fontWeight: FontWeight.normal), decoration: const InputDecoration(labelText: 'Description')),
                 TextField(
                   controller: deadlineController,
+                  style: const TextStyle(fontWeight: FontWeight.normal),
                   decoration: const InputDecoration(labelText: 'Deadline Date', hintText: 'YYYY-MM-DD'),
                   readOnly: true,
                   onTap: () async {
@@ -1287,6 +1366,7 @@ class _TasksSection extends StatelessWidget {
                 ),
                 TextField(
                   controller: timeController,
+                  style: const TextStyle(fontWeight: FontWeight.normal),
                   decoration: const InputDecoration(labelText: 'Deadline Time', hintText: 'HH:MM'),
                   readOnly: true,
                   onTap: () async {
@@ -1390,7 +1470,7 @@ class _TaskCardState extends State<_TaskCard> {
             color: isVerified ? Colors.green : (isCompleted ? Colors.orange : Colors.grey),
           ),
         ),
-        title: Text(widget.task.title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF14375E))),
+        title: Text(widget.task.title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.black)),
         subtitle: Text('Group: ${widget.task.groupCode} • Due: ${widget.task.deadline} ${widget.task.deadlineTime}'),
         children: [
           Padding(
@@ -1403,12 +1483,45 @@ class _TaskCardState extends State<_TaskCard> {
                 const Divider(height: 24),
                 if (widget.task.submission != null) ...[
                   const Text('Group Submission:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.all(12),
                     width: double.infinity,
-                    decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8)),
-                    child: Text(widget.task.submission!, style: const TextStyle(fontSize: 13)),
+                    decoration: BoxDecoration(
+                      color: AppColors.panelSoft,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.borderLight),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SelectableText(
+                          widget.task.submission!,
+                          style: const TextStyle(fontSize: 13, color: Colors.black),
+                        ),
+                        if (widget.task.submission!.trim().toLowerCase().startsWith('http')) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                final url = Uri.parse(widget.task.submission!.trim());
+                                if (await canLaunchUrl(url)) {
+                                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                                }
+                              },
+                              icon: const Icon(Icons.open_in_new, size: 16),
+                              label: const Text('Open Submission Link'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.black,
+                                side: const BorderSide(color: Colors.black),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 24),
                 ],
@@ -1446,7 +1559,7 @@ class _TaskCardState extends State<_TaskCard> {
                               padding: const EdgeInsets.only(bottom: 8),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.person, size: 16, color: Color(0xFF1E6091)),
+                                  Icon(Icons.person, size: 16, color: Theme.of(context).colorScheme.primary),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Column(
@@ -1520,10 +1633,11 @@ class _TaskCardState extends State<_TaskCard> {
 }
 
 class _DocumentsReviewSection extends StatelessWidget {
-  const _DocumentsReviewSection({required this.supervisorUid, required this.groupsRef});
+  const _DocumentsReviewSection({required this.supervisorUid, required this.groupsRef, this.university});
 
   final String supervisorUid;
   final DatabaseReference groupsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -1536,7 +1650,14 @@ class _DocumentsReviewSection extends StatelessWidget {
         final data = snapshot.data?.snapshot.value;
         if (data is! Map) return const Center(child: Text('No documents found.'));
 
-        final myGroups = Map<String, dynamic>.from(data).entries.where((e) {
+        final allEntries = Map<String, dynamic>.from(data);
+        
+        // Filter by University
+        final entries = university == null 
+          ? allEntries 
+          : Map.fromEntries(allEntries.entries.where((e) => (e.value as Map)['university'] == university));
+
+        final myGroups = entries.entries.where((e) {
           final val = e.value;
           return val is Map && val['supervisorId'] == supervisorUid;
         }).toList();
@@ -1568,7 +1689,7 @@ class _DocumentsReviewSection extends StatelessWidget {
             const SizedBox(height: 16),
             if (allDocs.isEmpty)
               const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No documents uploaded by groups yet.'))),
-            ...allDocs.map((d) => _DocCard(doc: d)).toList(),
+            ...allDocs.map((d) => _DocCard(doc: d)),
           ],
         );
       },
@@ -1608,7 +1729,7 @@ class _DocCard extends StatelessWidget {
         subtitle: Text('${doc.groupCode} • ${doc.type}'),
         trailing: doc.downloadUrl != null
             ? IconButton(
-                icon: const Icon(Icons.download, color: Color(0xFF1E6091)),
+                icon: Icon(Icons.download, color: Theme.of(context).colorScheme.primary),
                 onPressed: () async {
                   final uri = Uri.parse(doc.downloadUrl!);
                   if (await canLaunchUrl(uri)) {
@@ -1627,10 +1748,11 @@ class _DocCard extends StatelessWidget {
 }
 
 class _CommentsSection extends StatelessWidget {
-  const _CommentsSection({required this.supervisorUid, required this.groupsRef});
+  const _CommentsSection({required this.supervisorUid, required this.groupsRef, this.university});
 
   final String supervisorUid;
   final DatabaseReference groupsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -1644,7 +1766,12 @@ class _CommentsSection extends StatelessWidget {
         if (data is! Map) return const Center(child: Text('No feedback found.'));
 
         final myGroupsFeedback = <Map<String, dynamic>>[];
-        final entries = Map<String, dynamic>.from(data);
+        final allEntries = Map<String, dynamic>.from(data);
+        
+        // Filter by University
+        final entries = university == null 
+          ? allEntries 
+          : Map.fromEntries(allEntries.entries.where((e) => (e.value as Map)['university'] == university));
         
         entries.forEach((groupCode, groupData) {
           if (groupData is Map && groupData['supervisorId'] == supervisorUid) {
@@ -1674,7 +1801,7 @@ class _CommentsSection extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: const Color(0xFFEDF1F9),
+                  backgroundColor: AppColors.selectedTile,
                   child: Icon(fb['source'] == 'Proposal' ? Icons.description : Icons.assignment, size: 20),
                 ),
                 title: Text(fb['projectTitle'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -1735,10 +1862,11 @@ class _CommentCard extends StatelessWidget {
 }
 
 class _MeetingRequestsSection extends StatelessWidget {
-  const _MeetingRequestsSection({required this.supervisorUid, required this.groupsRef});
+  const _MeetingRequestsSection({required this.supervisorUid, required this.groupsRef, this.university});
 
   final String supervisorUid;
   final DatabaseReference groupsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -1751,7 +1879,14 @@ class _MeetingRequestsSection extends StatelessWidget {
         final data = snapshot.data?.snapshot.value;
         if (data is! Map) return const Center(child: Text('No groups found.'));
 
-        final myGroups = Map<String, dynamic>.from(data).entries.where((e) {
+        final allEntries = Map<String, dynamic>.from(data);
+        
+        // Filter by University
+        final entries = university == null 
+          ? allEntries 
+          : Map.fromEntries(allEntries.entries.where((e) => (e.value as Map)['university'] == university));
+
+        final myGroups = entries.entries.where((e) {
           final val = e.value;
           return val is Map && val['supervisorId'] == supervisorUid;
         }).toList();
@@ -1784,7 +1919,7 @@ class _MeetingRequestsSection extends StatelessWidget {
             const SizedBox(height: 16),
             if (allMeetings.isEmpty)
               const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No meeting requests yet.'))),
-            ...allMeetings.map((m) => _MeetingCard(meeting: m, groupsRef: groupsRef)).toList(),
+            ...allMeetings.map((m) => _MeetingCard(meeting: m, groupsRef: groupsRef)),
           ],
         );
       },
@@ -1834,7 +1969,7 @@ class _MeetingCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Group: ${meeting.groupCode}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF14375E))),
+                      Text('Group: ${meeting.groupCode}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.black)),
                       const SizedBox(height: 4),
                       Text('${meeting.requestedDate} at ${meeting.requestedTime}', style: TextStyle(color: Colors.grey[700], fontSize: 13)),
                       Text('Duration: ${meeting.duration}', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
@@ -1873,7 +2008,7 @@ class _MeetingCard extends StatelessWidget {
                   Expanded(
                     child: FilledButton(
                       onPressed: () => _updateStatus(context, 'Approved'),
-                      style: FilledButton.styleFrom(backgroundColor: const Color(0xFF14375E)),
+                      style: FilledButton.styleFrom(backgroundColor: AppColors.black),
                       child: const Text('Approve'),
                     ),
                   ),
@@ -1944,10 +2079,11 @@ class _MeetingCard extends StatelessWidget {
 }
 
 class _ProgressMonitoringSection extends StatelessWidget {
-  const _ProgressMonitoringSection({required this.supervisorUid, required this.groupsRef});
+  const _ProgressMonitoringSection({required this.supervisorUid, required this.groupsRef, this.university});
 
   final String supervisorUid;
   final DatabaseReference groupsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -1960,7 +2096,14 @@ class _ProgressMonitoringSection extends StatelessWidget {
         final data = snapshot.data?.snapshot.value;
         if (data is! Map) return const Center(child: Text('No groups found.'));
 
-        final myGroups = Map<String, dynamic>.from(data).entries.where((e) {
+        final allEntries = Map<String, dynamic>.from(data);
+        
+        // Filter by University
+        final entries = university == null 
+          ? allEntries 
+          : Map.fromEntries(allEntries.entries.where((e) => (e.value as Map)['university'] == university));
+
+        final myGroups = entries.entries.where((e) {
           final val = e.value;
           return val is Map && val['supervisorId'] == supervisorUid;
         }).toList();
@@ -2013,7 +2156,7 @@ class _ProgressCard extends StatelessWidget {
                 value: percentage / 100,
                 minHeight: 8,
                 backgroundColor: Colors.grey[200],
-                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1E6091)),
+                valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
               ),
             ),
             const SizedBox(height: 8),
@@ -2025,16 +2168,22 @@ class _ProgressCard extends StatelessWidget {
   }
 }
 
-class _MarksRemarksSection extends StatelessWidget {
-  const _MarksRemarksSection({required this.supervisorUid, required this.groupsRef});
+class _MarksRemarksSection extends StatefulWidget {
+  const _MarksRemarksSection({required this.supervisorUid, required this.groupsRef, this.university});
 
   final String supervisorUid;
   final DatabaseReference groupsRef;
+  final String? university;
 
+  @override
+  State<_MarksRemarksSection> createState() => _MarksRemarksSectionState();
+}
+
+class _MarksRemarksSectionState extends State<_MarksRemarksSection> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DatabaseEvent>(
-      stream: groupsRef.onValue,
+      stream: widget.groupsRef.onValue,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -2042,15 +2191,33 @@ class _MarksRemarksSection extends StatelessWidget {
         final data = snapshot.data?.snapshot.value;
         if (data is! Map) return const Center(child: Text('No groups found.'));
 
-        final myGroups = Map<String, dynamic>.from(data).entries.where((e) {
+        final allEntries = Map<String, dynamic>.from(data);
+        
+        // Filter by University
+        final entries = widget.university == null 
+          ? allEntries 
+          : Map.fromEntries(allEntries.entries.where((e) => (e.value as Map)['university'] == widget.university));
+
+        final myGroups = entries.entries.where((e) {
           final val = e.value;
-          return val is Map && val['supervisorId'] == supervisorUid;
+          return val is Map && val['supervisorId'] == widget.supervisorUid;
         }).toList();
 
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text('Marks & Remarks', style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              children: [
+                Expanded(child: Text('Marks & Remarks', style: Theme.of(context).textTheme.titleMedium)),
+                IconButton(
+                  tooltip: 'Download marks CSV',
+                  icon: Icon(Icons.download, color: Theme.of(context).colorScheme.primary),
+                  onPressed: () async {
+                    await _downloadCsv(data as Map?);
+                  },
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             if (myGroups.isEmpty)
               const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No assigned groups.'))),
@@ -2076,7 +2243,7 @@ class _MarksRemarksSection extends StatelessWidget {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.edit, color: Color(0xFF1E6091)),
+                            icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
                             onPressed: () => _showMarkDialog(context, g.key, groupData['marks'], groupData['remarks']),
                           ),
                         ],
@@ -2116,11 +2283,13 @@ class _MarksRemarksSection extends StatelessWidget {
             children: [
               TextField(
                 controller: marksController,
+                style: const TextStyle(fontWeight: FontWeight.normal),
                 decoration: const InputDecoration(labelText: 'Marks (0-100)'),
                 keyboardType: TextInputType.number,
               ),
               TextField(
                 controller: remarksController,
+                style: const TextStyle(fontWeight: FontWeight.normal),
                 decoration: const InputDecoration(labelText: 'Remarks'),
                 maxLines: 3,
               ),
@@ -2131,7 +2300,7 @@ class _MarksRemarksSection extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
             onPressed: () async {
-              await groupsRef.child(groupCode).update({
+              await widget.groupsRef.child(groupCode).update({
                 'marks': int.tryParse(marksController.text) ?? 0,
                 'remarks': remarksController.text,
               });
@@ -2143,13 +2312,106 @@ class _MarksRemarksSection extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _downloadCsv(Map? allGroupsData) async {
+    // Lazy import of helper to avoid unused import warnings
+    // Build CSV only for groups supervised by current user
+    if (allGroupsData == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No groups data available')));
+      return;
+    }
+
+    final myGroups = Map<String, dynamic>.from(allGroupsData).entries.where((e) {
+      final val = e.value;
+      return val is Map && val['supervisorId'] == widget.supervisorUid;
+    }).toList();
+
+    final rows = <List<String>>[];
+    rows.add(['GroupCode', 'ProjectTitle', 'MemberNames', 'MemberMarks', 'Marks', 'Remarks']);
+
+    // gather all member UIDs across the groups so we can fetch their names in batch
+    final usersRef = FirebaseDatabase.instance.ref('users');
+    final allMemberUids = <String>{};
+    for (final g in myGroups) {
+      final data = g.value as Map;
+      if (data['members'] is Map) {
+        allMemberUids.addAll((data['members'] as Map).keys.cast<String>());
+      }
+      if (data['memberMarks'] is Map) {
+        allMemberUids.addAll((data['memberMarks'] as Map).keys.cast<String>());
+      }
+    }
+
+    // fetch names for each uid
+    final Map<String, String> uidToName = {};
+    for (final uid in allMemberUids) {
+      try {
+        final snap = await usersRef.child(uid).get();
+        if (snap.exists && snap.value is Map) {
+          final m = Map<String, dynamic>.from(snap.value as Map);
+          uidToName[uid] = (m['fullName'] ?? uid).toString();
+        } else {
+          uidToName[uid] = uid;
+        }
+      } catch (_) {
+        uidToName[uid] = uid;
+      }
+    }
+
+    for (final g in myGroups) {
+      final key = g.key;
+      final data = Map<String, dynamic>.from(g.value as Map);
+      final title = (data['projectTitle'] ?? '').toString().replaceAll('\n', ' ');
+      final marks = data['marks']?.toString() ?? '';
+      final remarks = data['remarks']?.toString() ?? '';
+
+      final membersMap = data['members'] is Map ? Map<String, dynamic>.from(data['members'] as Map) : {};
+      final memberMarksMap = data['memberMarks'] is Map ? Map<String, dynamic>.from(data['memberMarks'] as Map) : {};
+
+      final memberUids = membersMap.keys.cast<String>().toList();
+
+      final memberNames = memberUids.map((uid) {
+        final name = uidToName[uid] ?? uid;
+        final sid = membersMap[uid] is Map ? (membersMap[uid]['studentId'] ?? '') : '';
+        return sid != '' ? '$name ($sid)' : name;
+      }).join(';');
+
+      final memberMarks = memberUids.map((uid) {
+        final name = uidToName[uid] ?? uid;
+        final mark = memberMarksMap[uid]?.toString() ?? '';
+        return '$name:$mark';
+      }).join(';');
+
+      rows.add([key, title, memberNames, memberMarks, marks, remarks]);
+    }
+
+    final csv = StringBuffer();
+    for (final r in rows) {
+      final escaped = r.map((c) {
+        final needs = c.contains(',') || c.contains('"') || c.contains('\n');
+        var col = c.replaceAll('"', '""');
+        if (needs) col = '"$col"';
+        return col;
+      }).join(',');
+      csv.writeln(escaped);
+    }
+
+    final filename = 'marks_${DateTime.now().toIso8601String().replaceAll(':', '-')}.csv';
+    try {
+      await saveFile(filename, csv.toString(), mime: 'text/csv');
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download started')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save file: $e')));
+    }
+  }
 }
 
 class _DeadlinesSection extends StatelessWidget {
-  const _DeadlinesSection({required this.supervisorUid, required this.groupsRef});
+  const _DeadlinesSection({required this.supervisorUid, required this.groupsRef, this.university});
 
   final String supervisorUid;
   final DatabaseReference groupsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -2162,7 +2424,14 @@ class _DeadlinesSection extends StatelessWidget {
         final data = snapshot.data?.snapshot.value;
         if (data is! Map) return const Center(child: Text('No groups found.'));
 
-        final myGroups = Map<String, dynamic>.from(data).entries.where((e) {
+        final allEntries = Map<String, dynamic>.from(data);
+        
+        // Filter by University
+        final entries = university == null 
+          ? allEntries 
+          : Map.fromEntries(allEntries.entries.where((e) => (e.value as Map)['university'] == university));
+
+        final myGroups = entries.entries.where((e) {
           final val = e.value;
           return val is Map && val['supervisorId'] == supervisorUid;
         }).toList();
@@ -2182,7 +2451,7 @@ class _DeadlinesSection extends StatelessWidget {
                   title: Text(groupData['projectTitle'] ?? 'No Title'),
                   subtitle: Text('Proposal Deadline: ${groupData['proposalDeadline'] ?? 'Not set'}'),
                   trailing: IconButton(
-                    icon: const Icon(Icons.calendar_month, color: Color(0xFF1E6091)),
+                    icon: Icon(Icons.calendar_month, color: Theme.of(context).colorScheme.primary),
                     onPressed: () => _showDeadlineDialog(context, g.key),
                   ),
                 ),
@@ -2203,6 +2472,7 @@ class _DeadlinesSection extends StatelessWidget {
         title: Text('Set Proposal Deadline for $groupCode'),
         content: TextField(
           controller: dateController,
+          style: const TextStyle(fontWeight: FontWeight.normal),
           decoration: const InputDecoration(labelText: 'Deadline (YYYY-MM-DD)'),
           readOnly: true,
           onTap: () async {
@@ -2233,11 +2503,13 @@ class _DeadlinesSection extends StatelessWidget {
 }
 
 class _SharedDocumentsSection extends StatelessWidget {
-  const _SharedDocumentsSection();
+  const _SharedDocumentsSection({this.university});
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
-    final docsRef = FirebaseDatabase.instance.ref('documents_by_role/Supervisor');
+    final uniPath = university ?? 'default';
+    final docsRef = FirebaseDatabase.instance.ref('admin/universities/$uniPath/documents_by_role/Supervisor');
     return StreamBuilder<DatabaseEvent>(
       stream: docsRef.onValue,
       builder: (context, snapshot) {
@@ -2268,17 +2540,17 @@ class _SharedDocumentsSection extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: Color(0xFFE6E6E6)),
+                side: const BorderSide(color: AppColors.borderVeryLight),
               ),
               child: ListTile(
                 leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFEDF1F9),
-                  child: Icon(Icons.description, color: Color(0xFF14375E)),
+                  backgroundColor: AppColors.selectedTile,
+                  child: const Icon(Icons.description, color: AppColors.black),
                 ),
                 title: Text(doc['title'], style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(doc['description'].isNotEmpty ? doc['description'] : doc['fileName']),
                 trailing: IconButton(
-                  icon: const Icon(Icons.open_in_new, color: Color(0xFF1E6091)),
+                  icon: Icon(Icons.open_in_new, color: Theme.of(context).colorScheme.primary),
                   onPressed: () async {
                     if (doc['fileUrl'].isNotEmpty) {
                       final url = Uri.parse(doc['fileUrl']);

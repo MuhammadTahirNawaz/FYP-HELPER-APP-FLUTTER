@@ -2,11 +2,12 @@ import 'package:file_selector/file_selector.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/cloudinary_service.dart';
-import '../shared/messages_screen.dart';
 import 'student_settings_screen.dart';
 import 'student_nav_bar.dart';
+import '../auth/sign_out_screen.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
   const StudentDashboardScreen({super.key});
@@ -40,7 +41,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   late String _currentUid;
   late DatabaseReference _groupsRef;
   late DatabaseReference _studentRef;
-  late DatabaseReference _adminRef;
 
   @override
   void initState() {
@@ -49,42 +49,58 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     _currentUid = FirebaseAuth.instance.currentUser!.uid;
     _groupsRef = FirebaseDatabase.instance.ref('groups');
     _studentRef = FirebaseDatabase.instance.ref('users').child(_currentUid);
-    _adminRef = FirebaseDatabase.instance.ref('admin');
+    _fetchUniversity();
   }
+
+  Future<void> _fetchUniversity() async {
+    final snap = await _studentRef.get();
+    if (snap.exists && snap.value is Map) {
+      final data = Map<String, dynamic>.from(snap.value as Map);
+      if (mounted) {
+        setState(() {
+          _university = data['university'] as String?;
+        });
+      }
+    }
+  }
+
+  String? _university;
+  DatabaseReference get _adminRef => FirebaseDatabase.instance.ref('admin/universities/${_university ?? "default"}');
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         elevation: 0,
         centerTitle: false,
-        backgroundColor: const Color(0xFF000000),
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               _currentSection.label,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Colors.white),
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -0.5, color: Colors.white),
             ),
-            Text(
-              'Student workspace',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white60,
-                    fontSize: 11,
-                  ),
+            Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.studentTeal),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Student workspace',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppColors.studentTeal,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
             ),
           ],
-        ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF000000), Color(0xFF1E293B)],
-            ),
-          ),
         ),
         actions: [
           StreamBuilder<DatabaseEvent>(
@@ -109,7 +125,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         decoration: BoxDecoration(
                           color: Colors.red.shade400,
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF3B82F6), width: 1.5),
+                          border: Border.all(color: AppColors.infoBlue, width: 1.5),
                         ),
                         constraints: const BoxConstraints(minWidth: 10, minHeight: 10),
                       ),
@@ -127,7 +143,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
               margin: const EdgeInsets.only(right: 16),
               child: CircleAvatar(
                 radius: 18,
-                backgroundColor: Colors.white.withOpacity(0.2),
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
                 child: const Icon(Icons.person, color: Colors.white, size: 20),
               ),
             ),
@@ -148,6 +164,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           studentRef: _studentRef,
           adminRef: _adminRef,
           currentUid: _currentUid,
+          university: _university,
         ),
       ),
       bottomNavigationBar: const StudentNavBar(selectedIndex: 0),
@@ -156,75 +173,106 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
   Widget _buildDrawer() {
     return Drawer(
-      backgroundColor: const Color(0xFFFFFFFF),
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF000000), Color(0xFF1E293B)],
+      backgroundColor: AppColors.bg,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.studentTeal.withValues(alpha: 0.2), Colors.transparent],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.studentTeal.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.studentTeal.withValues(alpha: 0.3)),
+                    ),
+                    child: const Icon(Icons.school_outlined, color: AppColors.studentTeal, size: 30),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Student Portal',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900, color: Colors.white
+                        ),
+                  ),
+                  Text(
+                    'Academic Workspace',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.studentTeal,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ],
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Colors.white,
-                  child: const Icon(Icons.school, color: Color(0xFF3B82F6)),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Student Dashboard',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
+            const Divider(color: AppColors.border, height: 1),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                children: [
+                  ..._StudentSection.values.map((section) {
+                    final isSelected = _currentSection == section;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        tileColor: isSelected ? AppColors.studentTeal.withValues(alpha: 0.1) : Colors.transparent,
+                        leading: Icon(
+                          section.icon,
+                          color: isSelected ? AppColors.studentTeal : AppColors.textSecondary,
+                        ),
+                        title: Text(
+                          section.label,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : AppColors.textSecondary,
+                            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                          ),
+                        ),
+                        onTap: () {
+                          setState(() => _currentSection = section);
+                          Navigator.pop(context);
+                        },
                       ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Track your FYP journey end to end',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white70,
-                      ),
-                ),
-              ],
+                    );
+                  }),
+                ],
+              ),
             ),
-          ),
-          ..._StudentSection.values.map((section) {
-            final isSelected = _currentSection == section;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: ListTile(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                tileColor: isSelected ? const Color(0xFFEEF2FF) : Colors.transparent,
-                leading: Icon(
-                  section.icon,
-                  color: isSelected ? const Color(0xFF1E6091) : const Color(0xFF64748B),
-                  size: 22,
-                ),
-                title: Text(
-                  section.label,
-                  style: TextStyle(
-                    color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFF94A3B8),
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    fontSize: 14,
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pushNamed(SignOutScreen.routeName),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(backgroundColor: AppColors.studentTeal, radius: 18, child: Icon(Icons.logout, color: Colors.black, size: 18)),
+                      const SizedBox(width: 12),
+                      Text('Logout Session', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    ],
                   ),
                 ),
-                onTap: () {
-                  setState(() => _currentSection = section);
-                  Navigator.pop(context);
-                },
               ),
-            );
-          }),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -237,6 +285,7 @@ class _StudentSectionBody extends StatefulWidget {
     required this.studentRef,
     required this.adminRef,
     required this.currentUid,
+    this.university,
   });
 
   final _StudentSection section;
@@ -244,6 +293,7 @@ class _StudentSectionBody extends StatefulWidget {
   final DatabaseReference studentRef;
   final DatabaseReference adminRef;
   final String currentUid;
+  final String? university;
 
   @override
   State<_StudentSectionBody> createState() => _StudentSectionBodyState();
@@ -277,7 +327,7 @@ class _StudentSectionBodyState extends State<_StudentSectionBody> {
           case _StudentSection.proposal:
             return _SubmitProposalSection(groupsRef: widget.groupsRef, currentUid: widget.currentUid, groupId: myGroupId);
           case _StudentSection.sharedDocuments:
-            return const _SharedDocumentsSection();
+            return _SharedDocumentsSection(university: widget.university);
           case _StudentSection.documents:
             return _UploadDocumentsSection(studentRef: widget.studentRef, currentUid: widget.currentUid, groupsRef: widget.groupsRef, groupId: myGroupId);
           case _StudentSection.tasks:
@@ -341,34 +391,35 @@ class _StudentDashboardHome extends StatelessWidget {
                   
                   // Supervisor Banner
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
-                      ],
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: AppColors.border, width: 1.5),
                     ),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: const Color(0xFFEDF1F9),
-                          child: Icon(Icons.supervisor_account, color: Color(0xFF14375E)),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.studentTeal.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(Icons.supervisor_account_outlined, color: AppColors.studentTeal, size: 28),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 20),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('YOUR SUPERVISOR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B), letterSpacing: 1)),
-                              Text(supervisorName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF14375E))),
+                              Text('SUPERVISOR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.studentTeal, letterSpacing: 1.5)),
+                              const SizedBox(height: 4),
+                              Text(supervisorName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white)),
                             ],
                           ),
                         ),
                         if (myGroup['supervisorId'] != null)
-                          const Icon(Icons.verified, color: Colors.blue, size: 20),
+                          const Icon(Icons.verified_user, color: AppColors.studentTeal, size: 22),
                       ],
                     ),
                   ),
@@ -378,7 +429,7 @@ class _StudentDashboardHome extends StatelessWidget {
                     crossAxisCount: 2,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
-                    childAspectRatio: 0.85, // Adjust for taller content
+                    childAspectRatio: 0.85, 
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     children: [
@@ -386,7 +437,7 @@ class _StudentDashboardHome extends StatelessWidget {
                         title: 'Group Code',
                         value: myGroupEntry.key,
                         icon: Icons.tag,
-                        color: const Color(0xFF1E6091),
+                        color: const Color(0xFF38BDF8),
                       ),
                       _StatCard(
                         title: 'Proposal Status',
@@ -412,23 +463,15 @@ class _StudentDashboardHome extends StatelessWidget {
                       builder: (context) {
                         final vivaDate = DateTime.parse(myGroup['vivaDate']);
                         final now = DateTime.now();
-                        // Only show if the viva date hasn't passed yet
                         if (vivaDate.isBefore(now.subtract(const Duration(days: 1)))) {
                           return const SizedBox.shrink();
                         }
 
                         return Container(
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: AppColors.surface,
                             borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF8B5CF6).withOpacity(0.08),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                            border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.1)),
+                            border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1)),
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(24),
@@ -481,20 +524,20 @@ class _StudentDashboardHome extends StatelessWidget {
                                               style: const TextStyle(
                                                 fontSize: 22,
                                                 fontWeight: FontWeight.w800,
-                                                color: Color(0xFF1E293B),
+                                                color: Colors.white,
                                               ),
                                             ),
                                             const Text(
                                               'Set by FYP Committee',
                                               style: TextStyle(
-                                                color: Color(0xFF64748B),
+                                                color: AppColors.textMuted,
                                                 fontSize: 12,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                      const Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xFFCBD5E1)),
+                                      const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textMuted),
                                     ],
                                   ),
                                 ),
@@ -511,16 +554,29 @@ class _StudentDashboardHome extends StatelessWidget {
           }
         }
 
-        return const Center(
+        return Center(
           child: Padding(
-            padding: EdgeInsets.all(32),
+            padding: const EdgeInsets.all(32),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.group_add, size: 64, color: Color(0xFFCBD5E1)),
-                SizedBox(height: 16),
-                Text('No Group Assigned', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-                Text('Join or create a group to start your FYP.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF94A3B8))),
+                Icon(Icons.group_add, size: 64, color: AppColors.studentTeal.withValues(alpha: 0.3)),
+                const SizedBox(height: 16),
+                const Text('No Group Assigned', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                const SizedBox(height: 8),
+                const Text('Join or create a group to start your FYP.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted)),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).pushNamed('/student-groups'),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Join or Create Group'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.studentTeal,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
               ],
             ),
           ),
@@ -547,48 +603,49 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [color.withOpacity(0.08), color.withOpacity(0.02)],
-        ),
-        border: Border.all(color: color.withOpacity(0.15)),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppColors.border, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: color.withValues(alpha: 0.05),
+            blurRadius: 20,
+            spreadRadius: -10,
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: color.withOpacity(0.12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
               child: Icon(icon, color: color, size: 22),
             ),
-            const SizedBox(height: 12),
+            const Spacer(),
             Text(
               value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF14375E),
-                    fontSize: 28,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    fontSize: 24,
+                    letterSpacing: -1,
                   ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
-              title,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF64748B),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+              title.toUpperCase(),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 10,
+                    letterSpacing: 1,
                   ),
             ),
           ],
@@ -612,50 +669,50 @@ class _DashboardBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF14375E), Color(0xFF1E6091)],
-        ),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: AppColors.studentTeal.withValues(alpha: 0.3), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF14375E).withOpacity(0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: AppColors.studentTeal.withValues(alpha: 0.1),
+            blurRadius: 30,
+            spreadRadius: -5,
           ),
         ],
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: Colors.white.withOpacity(0.12),
-            child: Icon(icon, color: Colors.white, size: 26),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.studentTeal.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.studentTeal.withValues(alpha: 0.4)),
+              boxShadow: [
+                BoxShadow(color: AppColors.studentTeal.withValues(alpha: 0.3), blurRadius: 15),
+              ],
+            ),
+            child: Icon(icon, color: AppColors.studentTeal, size: 32),
           ),
-          const SizedBox(width: 18),
+          const SizedBox(width: 24),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                      ),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withOpacity(0.8),
-                        height: 1.5,
-                        fontSize: 13,
-                      ),
+                  style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                 ),
               ],
             ),
@@ -771,17 +828,17 @@ class _SupervisorsListSectionState extends State<_SupervisorsListSection> {
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                side: const BorderSide(color: AppColors.borderSoft),
               ),
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 leading: CircleAvatar(
                   backgroundColor: const Color(0xFFEEF2FF),
-                  child: const Icon(Icons.supervisor_account, color: Color(0xFF1E6091), size: 22),
+                  child: const Icon(Icons.supervisor_account, color: Color(0xFF38BDF8), size: 22),
                 ),
                 title: Text(
                   supervisor['name'],
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF14375E)),
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.studentTeal),
                 ),
                 subtitle: Text(supervisor['dept']),
                 trailing: FilledButton.icon(
@@ -913,7 +970,7 @@ class _SubmitProposalSectionState extends State<_SubmitProposalSection> {
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  side: const BorderSide(color: AppColors.borderSoft),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(20),
@@ -946,13 +1003,13 @@ class _SubmitProposalSectionState extends State<_SubmitProposalSection> {
                       const SizedBox(height: 24),
                       const Divider(),
                       const SizedBox(height: 16),
-                      const Center(child: Icon(Icons.picture_as_pdf, size: 48, color: Color(0xFF1E6091))),
+                      const Center(child: Icon(Icons.picture_as_pdf, size: 48, color: Color(0xFF38BDF8))),
                       const SizedBox(height: 12),
                       if (proposalUrl != null)
                         Center(
                           child: Text(
                             'Current Document: Submitted',
-                            style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.w600, fontSize: 13),
+                            style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 13),
                           ),
                         ),
                       const SizedBox(height: 20),
@@ -965,13 +1022,18 @@ class _SubmitProposalSectionState extends State<_SubmitProposalSection> {
                           ],
                         )
                       else
-                        FilledButton.icon(
-                          onPressed: _uploadProposal,
-                          icon: const Icon(Icons.cloud_upload),
-                          label: Text(proposalUrl == null ? 'Submit Proposal (PDF)' : 'Update & Resubmit'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF000000),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: _uploadProposal,
+                            icon: const Icon(Icons.cloud_upload),
+                            label: Text(proposalUrl == null ? 'Submit Proposal (PDF)' : 'Update & Resubmit'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.studentTeal,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
                           ),
                         ),
                     ],
@@ -1027,7 +1089,7 @@ class _ProposalStatusSection extends StatelessWidget {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: statusColor.withOpacity(0.2)),
+              side: BorderSide(color: statusColor.withValues(alpha: 0.2)),
             ),
             child: Padding(
               padding: const EdgeInsets.all(28),
@@ -1037,7 +1099,7 @@ class _ProposalStatusSection extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
+                      color: statusColor.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(Icons.pending_actions, size: 48, color: statusColor),
@@ -1293,14 +1355,14 @@ class _UploadDocumentsSectionState extends State<_UploadDocumentsSection> {
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
               fontSize: 20,
-              color: const Color(0xFF14375E),
+              color: AppColors.studentTeal,
             ),
           ),
           const SizedBox(height: 20),
           if (_uploading) ...[
             Text(
               'Uploading $_uploadLabel',
-              style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF14375E)),
+              style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.studentTeal),
             ),
             const SizedBox(height: 10),
             ClipRRect(
@@ -1308,8 +1370,8 @@ class _UploadDocumentsSectionState extends State<_UploadDocumentsSection> {
               child: LinearProgressIndicator(
                 value: _uploadProgress.toDouble(),
                 minHeight: 8,
-                backgroundColor: const Color(0xFFE2E8F0),
-                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1E6091)),
+                backgroundColor: AppColors.borderSoft,
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
               ),
             ),
             const SizedBox(height: 8),
@@ -1323,7 +1385,7 @@ class _UploadDocumentsSectionState extends State<_UploadDocumentsSection> {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              side: const BorderSide(color: AppColors.borderSoft),
             ),
             child: Padding(
               padding: const EdgeInsets.all(28),
@@ -1335,7 +1397,7 @@ class _UploadDocumentsSectionState extends State<_UploadDocumentsSection> {
                       color: const Color(0xFFEEF2FF),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.cloud_upload, size: 48, color: Color(0xFF1E6091)),
+                    child: const Icon(Icons.cloud_upload, size: 48, color: Color(0xFF38BDF8)),
                   ),
                   const SizedBox(height: 18),
                   FilledButton.icon(
@@ -1353,7 +1415,7 @@ class _UploadDocumentsSectionState extends State<_UploadDocumentsSection> {
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
               fontSize: 16,
-              color: const Color(0xFF14375E),
+              color: AppColors.studentTeal,
             ),
           ),
           const SizedBox(height: 12),
@@ -1389,24 +1451,24 @@ class _UploadDocumentsSectionState extends State<_UploadDocumentsSection> {
                     margin: const EdgeInsets.only(bottom: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      side: const BorderSide(color: AppColors.borderSoft),
                     ),
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       leading: CircleAvatar(
                         backgroundColor: const Color(0xFFEEF2FF),
-                        child: const Icon(Icons.description, color: Color(0xFF1E6091)),
+                        child: const Icon(Icons.description, color: Color(0xFF38BDF8)),
                       ),
                       title: Text(
                         title,
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF14375E)),
+                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.studentTeal),
                       ),
                       subtitle: Text(
                         fileName,
                         style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
                       ),
                       trailing: IconButton(
-                        icon: const Icon(Icons.open_in_new, color: Color(0xFF1E6091)),
+                        icon: const Icon(Icons.open_in_new, color: Color(0xFF38BDF8)),
                         onPressed: () async {
                           final downloadUrl = doc['downloadUrl'];
                           if (downloadUrl != null) {
@@ -1414,11 +1476,10 @@ class _UploadDocumentsSectionState extends State<_UploadDocumentsSection> {
                             if (await canLaunchUrl(uri)) {
                               await launchUrl(uri, mode: LaunchMode.externalApplication);
                             } else {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Could not open document')),
-                                );
-                              }
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Could not open document')),
+                              );
                             }
                           }
                         },
@@ -1474,7 +1535,7 @@ class _TasksMilestonesSection extends StatelessWidget {
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                side: const BorderSide(color: AppColors.borderSoft),
               ),
               child: ExpansionTile(
                 leading: CircleAvatar(
@@ -1486,7 +1547,7 @@ class _TasksMilestonesSection extends StatelessWidget {
                 ),
                 title: Text(
                   task['title'] ?? 'Task ${index + 1}',
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF14375E)),
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.studentTeal),
                 ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1500,8 +1561,8 @@ class _TasksMilestonesSection extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                         value: isVerified ? 1.0 : (isCompleted ? 0.75 : 0.25),
-                        backgroundColor: const Color(0xFFE2E8F0),
-                        color: isVerified ? Colors.green : (isCompleted ? Colors.orange : const Color(0xFF3B82F6)),
+                        backgroundColor: AppColors.borderSoft,
+                        color: isVerified ? Colors.green : (isCompleted ? Colors.orange : AppColors.infoBlue),
                         minHeight: 6,
                       ),
                     ),
@@ -1549,7 +1610,7 @@ class _TasksMilestonesSection extends StatelessWidget {
                               width: double.infinity,
                               child: FilledButton(
                                 onPressed: () => _showSubmitDialog(context, taskId),
-                                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF14375E)),
+                                style: FilledButton.styleFrom(backgroundColor: AppColors.studentTeal),
                                 child: const Text('Submit Task'),
                               ),
                             ),
@@ -1673,7 +1734,7 @@ class _WeeklyProgressSectionState extends State<_WeeklyProgressSection> {
               Text(
                 '${_progressValue.toInt()}%',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w800, color: Color(0xFF1E6091)),
+                style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w800, color: Color(0xFF38BDF8)),
               ),
               Slider(
                 value: _progressValue,
@@ -1701,7 +1762,7 @@ class _WeeklyProgressSectionState extends State<_WeeklyProgressSection> {
                   padding: EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Color(0xFF1E6091)),
+                      Icon(Icons.info_outline, color: Color(0xFF38BDF8)),
                       SizedBox(width: 12),
                       Expanded(child: Text('This percentage is visible to your supervisor for real-time tracking.', style: TextStyle(fontSize: 12))),
                     ],
@@ -1808,7 +1869,7 @@ class _MeetingRequestsSectionState extends State<_MeetingRequestsSection> {
           const SizedBox(height: 16),
 
           DropdownButtonFormField<String>(
-            value: _selectedDuration,
+            initialValue: _selectedDuration,
             decoration: InputDecoration(
               labelText: 'Duration',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -1844,7 +1905,7 @@ class _MeetingRequestsSectionState extends State<_MeetingRequestsSection> {
             icon: const Icon(Icons.send),
             label: const Text('Request Meeting'),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF000000),
+              backgroundColor: AppColors.studentTeal,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -1874,7 +1935,7 @@ class _MeetingRequestsSectionState extends State<_MeetingRequestsSection> {
                     margin: const EdgeInsets.only(bottom: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(color: isApproved ? Colors.green.withOpacity(0.3) : const Color(0xFFE2E8F0)),
+                      side: BorderSide(color: isApproved ? Colors.green.withValues(alpha: 0.3) : AppColors.borderSoft),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
@@ -1882,8 +1943,8 @@ class _MeetingRequestsSectionState extends State<_MeetingRequestsSection> {
                         children: [
                           ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: isApproved ? Colors.green[50] : const Color(0xFFEDF1F9),
-                              child: Icon(Icons.video_call, color: isApproved ? Colors.green : const Color(0xFF14375E)),
+                              backgroundColor: isApproved ? Colors.green[50] : AppColors.selectedTile,
+                              child: Icon(Icons.video_call, color: isApproved ? Colors.green : AppColors.studentTeal),
                             ),
                             title: Text('${m['requestedDate']} at ${m['requestedTime'] ?? 'N/A'}'),
                             subtitle: Text('Duration: ${m['duration'] ?? 'N/A'}'),
@@ -2022,17 +2083,17 @@ class _AnnouncementsSection extends StatelessWidget {
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                side: const BorderSide(color: AppColors.borderSoft),
               ),
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 leading: CircleAvatar(
                   backgroundColor: const Color(0xFFEEF2FF),
-                  child: const Icon(Icons.notifications, color: Color(0xFF1E6091)),
+                  child: const Icon(Icons.notifications, color: Color(0xFF38BDF8)),
                 ),
                 title: Text(
                   announcement['title'] ?? 'Announcement',
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF14375E)),
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.studentTeal),
                 ),
                 subtitle: Text(
                   announcement['content'] ?? '',
@@ -2082,7 +2143,7 @@ class _MarksAndFeedbackSection extends StatelessWidget {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              side: const BorderSide(color: AppColors.borderSoft),
             ),
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -2094,12 +2155,12 @@ class _MarksAndFeedbackSection extends StatelessWidget {
                     children: [
                       Text(
                         'Project Grade',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: const Color(0xFF14375E)),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: AppColors.studentTeal),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(12)),
-                        child: Text('$marks/100', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF1E6091), fontSize: 18)),
+                        child: Text('$marks/100', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF38BDF8), fontSize: 18)),
                       ),
                     ],
                   ),
@@ -2109,7 +2170,7 @@ class _MarksAndFeedbackSection extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: marks / 100,
                       minHeight: 10,
-                      backgroundColor: const Color(0xFFE2E8F0),
+                      backgroundColor: AppColors.borderSoft,
                       valueColor: AlwaysStoppedAnimation<Color>(marks >= 50 ? Colors.green : Colors.red),
                     ),
                   ),
@@ -2127,38 +2188,17 @@ class _MarksAndFeedbackSection extends StatelessWidget {
   }
 }
 
-class _SharedDocumentsSection extends StatefulWidget {
-  const _SharedDocumentsSection({super.key});
-
-  @override
-  State<_SharedDocumentsSection> createState() => _SharedDocumentsSectionState();
-}
-
-class _SharedDocumentsSectionState extends State<_SharedDocumentsSection> {
-  final DatabaseReference _usersRef = FirebaseDatabase.instance.ref('users');
-  final DatabaseReference _byRoleRef = FirebaseDatabase.instance.ref('documents_by_role');
-  String _role = 'Student';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRole();
-  }
-
-  Future<void> _loadRole() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    final snap = await _usersRef.child(user.uid).get();
-    if (snap.exists && snap.value is Map) {
-      final data = Map<String, dynamic>.from(snap.value as Map);
-      if (mounted) setState(() => _role = (data['role'] as String?) ?? 'Student');
-    }
-  }
+class _SharedDocumentsSection extends StatelessWidget {
+  const _SharedDocumentsSection({this.university});
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
+    final uniPath = university ?? 'default';
+    final docsRef = FirebaseDatabase.instance.ref('admin/universities/$uniPath/documents_by_role/Student');
+    
     return StreamBuilder<DatabaseEvent>(
-      stream: _byRoleRef.child(_role).onValue,
+      stream: docsRef.onValue,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -2187,21 +2227,23 @@ class _SharedDocumentsSectionState extends State<_SharedDocumentsSection> {
               margin: const EdgeInsets.only(bottom: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                side: const BorderSide(color: AppColors.borderSoft),
               ),
               child: ListTile(
                 leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFEDF1F9),
-                  child: Icon(Icons.description, color: Color(0xFF14375E)),
+                  backgroundColor: AppColors.selectedTile,
+                  child: Icon(Icons.description, color: AppColors.studentTeal),
                 ),
-                title: Text(doc['title'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(doc['description'].isNotEmpty ? doc['description'] : 'File: ${doc['fileName']}'),
+                title: Text(doc['title']!, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(doc['description']!.isNotEmpty ? doc['description']! : 'File: ${doc['fileName']}'),
                 trailing: IconButton(
-                  icon: const Icon(Icons.download, color: Color(0xFF1E6091)),
+                  icon: const Icon(Icons.open_in_new, color: Color(0xFF38BDF8)),
                   onPressed: () async {
-                    final url = Uri.parse(doc['fileUrl']);
-                    if (await canLaunchUrl(url)) {
-                      await launchUrl(url, mode: LaunchMode.externalApplication);
+                    if (doc['fileUrl']!.isNotEmpty) {
+                      final url = Uri.parse(doc['fileUrl']!);
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      }
                     }
                   },
                 ),
@@ -2213,3 +2255,4 @@ class _SharedDocumentsSectionState extends State<_SharedDocumentsSection> {
     );
   }
 }
+

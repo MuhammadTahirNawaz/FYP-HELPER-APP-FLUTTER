@@ -1,15 +1,14 @@
+import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter/material.dart';
-
+import '../../theme/app_colors.dart';
 import '../../data/roles.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_profile_service.dart';
-import '../../services/system_service.dart';
-import '../admin/admin_dashboard_screen.dart';
-import '../committee/committee_dashboard_screen.dart';
 import '../student/student_dashboard_screen.dart';
+import '../admin/admin_dashboard_screen.dart';
 import '../supervisor/supervisor_dashboard_screen.dart';
+import '../committee/committee_dashboard_screen.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -21,16 +20,26 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
-  String _selectedRole = kUserRoles.first;
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _studentIdController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final AuthService _authService = AuthService();
-  final UserProfileService _profileService = UserProfileService();
-  bool _isSubmitting = false;
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _fullNameController = TextEditingController();
+  final _studentIdController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _universityController = TextEditingController(); // For "Other" university
+
+  final _authService = AuthService();
+  final _profileService = UserProfileService();
+
+  bool _isLoading = false;
   bool _isSignUpMode = false;
+  bool _obscurePassword = true;
+  String _signupRole = 'Student';
+  String _selectedUniversity = 'UET';
+
+  final List<String> _universities = [
+    'UET', 'PU', 'UAF', 'UET KSK', 'UET TEXILA', 
+    'TAHIR FARAN', 'FAST', 'NUST', 'GCU', 'MEDICAL', 'Other'
+  ];
 
   @override
   void dispose() {
@@ -39,492 +48,202 @@ class _SignInScreenState extends State<SignInScreen> {
     _fullNameController.dispose();
     _studentIdController.dispose();
     _phoneController.dispose();
+    _universityController.dispose();
     super.dispose();
   }
 
-  bool get _isEmailValid {
-    final email = _emailController.text.trim().toLowerCase();
-    final atIndex = email.indexOf('@');
-    if (atIndex <= 0) {
-      return false;
+  void _handleAuth() async {
+    setState(() => _isLoading = true);
+    try {
+      if (_isSignUpMode) {
+        await _handleSignUp();
+      } else {
+        await _handleSignIn();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-    final dotIndex = email.indexOf('.', atIndex + 1);
-    return dotIndex > atIndex + 1;
-  }
-
-  bool get _canSubmit {
-    return _isEmailValid &&
-        _passwordController.text.trim().length >= 6 &&
-        !_isSubmitting;
   }
 
   Future<void> _handleSignIn() async {
-    if (!_canSubmit) {
-      return;
-    }
-    await SystemService.requestPermissions();
-    setState(() => _isSubmitting = true);
-    final messenger = ScaffoldMessenger.of(context);
-    final email = _emailController.text.trim().toLowerCase();
+    final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
-    try {
-      final credential = await _authService.signIn(
-        email: email,
-        password: password,
-      );
-      final user = credential.user;
-      if (user == null) {
-        throw StateError('User is not available after sign-in.');
-      }
 
+    if (email.isEmpty || password.isEmpty) {
+      throw 'Please fill in all fields';
+    }
+
+    final userCredential = await _authService.signIn(email: email, password: password);
+    final user = userCredential.user;
+    
+    if (user != null) {
       var profile = await _profileService.fetchProfile(user.uid);
-      if (_selectedRole == 'Admin') {
-        await _authService.reloadUser(user);
-        final refreshedUser = FirebaseAuth.instance.currentUser;
-        if (refreshedUser == null || !refreshedUser.emailVerified) {
-          await _authService.sendEmailVerification(user);
-          await _authService.signOut();
-          throw StateError(
-            'Admin access requires verified email. We sent a verification link to $email.',
-          );
-        }
+      if (profile == null) {
+        throw 'User profile not found. Please contact admin.';
+      }
+      
+      final role = profile.role;
 
-        if (profile == null) {
-          await _profileService.createProfile(
-            uid: user.uid,
-            email: email,
-            role: 'Admin',
-          );
-        } else if (profile.role != 'Admin') {
+      // Special check for Admins: Must be email verified
+      if (role == 'Admin') {
+        if (!user.emailVerified) {
+          await user.sendEmailVerification();
           await _authService.signOut();
-          throw StateError(
-            'Your account is assigned as ${profile.role}. Admin access is not allowed.',
-          );
+          throw 'Please verify your email before logging in. A new verification link has been sent.';
         }
-      } else {
-        if (profile == null) {
-          await _profileService.createProfile(
-            uid: user.uid,
-            email: email,
-            role: _selectedRole,
-            status: 'Active',
-          );
-          profile = await _profileService.fetchProfile(user.uid);
-        }
-        final role = profile?.role ?? _selectedRole;
-        if (role == 'Pending') {
-          await _authService.signOut();
-          throw StateError('Your account is awaiting admin approval.');
-        }
-        if (role == 'Rejected') {
-          await _authService.signOut();
-          throw StateError('Your account request was rejected.');
-        }
+      } else if (role == 'Pending') {
+        await _authService.signOut();
+        throw 'Your account is awaiting approval from your University Admin.';
       }
-
-      await _profileService.touchProfile(user.uid);
-      if (!mounted) {
-        return;
-      }
-      _navigateForRole(profile?.role ?? _selectedRole);
-    } on StateError catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(error.message)));
-    } on Exception catch (error) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Sign-in failed: $error')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+      
+      if (!mounted) return;
+      _navigateForRole(role);
     }
   }
 
   Future<void> _handleSignUp() async {
-    if (!_canSubmit) {
-      return;
-    }
-    setState(() => _isSubmitting = true);
-    final messenger = ScaffoldMessenger.of(context);
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
+    final fullName = _fullNameController.text.trim();
+    final phone = _phoneController.text.trim();
 
-    try {
-      print('DEBUG SIGNUP: Validating name');
-      if (_fullNameController.text.trim().isEmpty) {
-        throw StateError('Full Name is required for sign-up.');
-      }
+    if (email.isEmpty || password.isEmpty || fullName.isEmpty || phone.isEmpty) {
+      throw 'Please fill in all fields';
+    }
 
-      print('DEBUG SIGNUP: Registering user in Firebase Auth');
-      final credential = await _authService.register(
-        email: email,
-        password: password,
-      );
-      final user = credential.user;
-      if (user == null) {
-        throw StateError('User is not available after sign-up.');
-      }
+    final university = _selectedUniversity == 'Other' ? _universityController.text.trim() : _selectedUniversity;
+    if (university.isEmpty) throw 'Please select or enter your University';
 
-      print('DEBUG SIGNUP: Checking Student ID uniqueness');
-      if (_selectedRole == 'Student') {
-        final studentId = _studentIdController.text.trim();
-        if (studentId.isEmpty) {
-          await user.delete();
-          throw StateError('Student ID is required for sign-up.');
-        }
-        
-        try {
-          final existingIdQuery = await FirebaseDatabase.instance
-              .ref('users')
-              .orderByChild('studentId')
-              .equalTo(studentId)
-              .get();
+    final userCredential = await _authService.register(
+      email: email,
+      password: password,
+    );
 
-          if (existingIdQuery.exists) {
-            print('DEBUG SIGNUP: Duplicate Student ID found: $studentId');
-            await user.delete();
-            throw StateError('This Student ID ($studentId) is already registered. Please use your own ID.');
-          }
-        } catch (e) {
-          print('DEBUG SIGNUP: Uniqueness check failed: $e');
-          await user.delete(); // Safety first: don't create account if we can't verify uniqueness
-          if (e.toString().contains('permission-denied')) {
-            throw StateError('Database Permission Error: The system cannot verify your Student ID uniqueness. Please ensure Firebase Rules allow authenticated users to read the "users" node.');
-          }
-          throw StateError('System error during ID verification: $e');
-        }
-      }
+    final user = userCredential.user;
+    if (user != null) {
+      // If Admin, they start with 'Admin' role but need email verification
+      // Others start with 'Pending' and need Admin approval
+      final initialRole = _signupRole == 'Admin' ? 'Admin' : 'Pending';
       
-      print('DEBUG SIGNUP: Creating user profile in RTDB');
-      if (_selectedRole == 'Admin') {
-        await _authService.sendEmailVerification(user);
-        await _authService.signOut();
-        print('DEBUG SIGNUP: Admin signup complete (verification sent)');
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              'Verification link sent to $email. Please verify before signing in.',
-            ),
-          ),
-        );
+      await _profileService.createProfile(
+        uid: user.uid,
+        email: email,
+        role: initialRole,
+        requestedRole: _signupRole,
+        fullName: fullName,
+        phoneNumber: phone,
+        university: university,
+        studentId: _signupRole == 'Student' ? _studentIdController.text.trim() : null,
+      );
+
+      if (_signupRole == 'Admin') {
+        await user.sendEmailVerification();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Registration successful! Please verify your email to activate Admin account.')),
+          );
+        }
       } else {
-        await _profileService.createProfile(
-          uid: user.uid,
-          email: email,
-          fullName: _fullNameController.text.trim(),
-          studentId: _selectedRole == 'Student' ? _studentIdController.text.trim() : null,
-          phoneEncrypted: _authService.encryptPhone(_phoneController.text.trim()),
-          role: 'Pending',
-          requestedRole: _selectedRole,
-          status: 'Pending',
-        );
-        print('DEBUG SIGNUP: Profile created successfully');
-        await _authService.signOut();
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Sign-up received. Await admin approval to login.'),
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Registration successful! Awaiting approval from $_selectedUniversity Admin.')),
+          );
+        }
       }
-    } on FirebaseAuthException catch (error) {
-      if (error.code == 'email-already-in-use') {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Account already exists. Please sign in.')),
-        );
-      } else {
-        messenger.showSnackBar(
-          SnackBar(content: Text('Sign-up failed: ${error.message}')),
-        );
-      }
-    } on StateError catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text(error.message)));
-    } catch (error) {
-      messenger.showSnackBar(SnackBar(content: Text('An unexpected error occurred: $error')));
-    } finally {
+
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        setState(() {
+          _isSignUpMode = false;
+          _passwordController.clear();
+        });
       }
+    }
+  }
+
+  Future<void> _handleForgotPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email address first.')),
+      );
+      return;
+    }
+    
+    setState(() => _isLoading = true);
+    try {
+      await _authService.sendPasswordResetEmail(email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password reset email sent! Please check your inbox.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _navigateForRole(String role) {
     if (role == 'Admin') {
-      Navigator.of(context).pushReplacementNamed(
-        AdminDashboardScreen.routeName,
+      Navigator.of(context).pushReplacementNamed(AdminDashboardScreen.routeName);
+    } else if (role == 'Student') {
+      Navigator.of(context).pushReplacementNamed(StudentDashboardScreen.routeName);
+    } else if (role == 'Supervisor') {
+      Navigator.of(context).pushReplacementNamed(SupervisorDashboardScreen.routeName);
+    } else if (role == 'Committee') {
+      Navigator.of(context).pushReplacementNamed(CommitteeDashboardScreen.routeName);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Access denied. Role not recognized.')),
       );
-      return;
     }
-    if (role == 'Student') {
-      Navigator.of(context).pushReplacementNamed(
-        StudentDashboardScreen.routeName,
-      );
-      return;
-    }
-    if (role == 'Supervisor') {
-      Navigator.of(context).pushReplacementNamed(
-        SupervisorDashboardScreen.routeName,
-      );
-      return;
-    }
-    if (role == 'Committee') {
-      Navigator.of(context).pushReplacementNamed(
-        CommitteeDashboardScreen.routeName,
-      );
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Only admins, students, supervisors, or committee can access dashboards.',
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final accentColor = AppColors.studentTeal;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFF8F9FA),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'FYP Portal',
-                      style: Theme.of(context).textTheme.headlineLarge
-                          ?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            color: Colors.black,
-                            letterSpacing: -1,
-                          ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _isSignUpMode
-                          ? 'Create your account'
-                          : 'Sign in to manage your FYP journey',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: const Color(0xFF6B7280),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE5E7EB),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _AuthModeChip(
-                              label: 'Sign In',
-                              isSelected: !_isSignUpMode,
-                              onTap: () => setState(() => _isSignUpMode = false),
-                            ),
-                            _AuthModeChip(
-                              label: 'Sign Up',
-                              isSelected: _isSignUpMode,
-                              onTap: () => setState(() => _isSignUpMode = true),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Card(
-                      elevation: 0,
+      backgroundColor: AppColors.bg,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                children: [
+                  // Logo/Header
+                  Icon(Icons.school_rounded, size: 80, color: accentColor),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'FYP Helper System',
+                    style: TextStyle(
                       color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        side: const BorderSide(color: Color(0xFFE5E7EB)),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              'Role',
-                              style: Theme.of(context).textTheme.labelLarge
-                                  ?.copyWith(color: Colors.black, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 8),
-                            DropdownButtonFormField<String>(
-                              value: _selectedRole,
-                              items: kUserRoles
-                                  .map(
-                                    (role) => DropdownMenuItem<String>(
-                                      value: role,
-                                      child: Text(role),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (value) {
-                                if (value == null) {
-                                  return;
-                                }
-                                setState(() => _selectedRole = value);
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF3F4F6),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                _selectedRole == 'Admin'
-                                    ? 'Admins must verify email before access.'
-                                    : 'Sign-ups require admin approval before login.',
-                                style: const TextStyle(color: Color(0xFF4B5563)),
-                              ),
-                            ),
-                            if (_isSignUpMode) ...[
-                              const SizedBox(height: 16),
-                              Text(
-                                'Full Name',
-                                style: Theme.of(context).textTheme.labelLarge
-                                    ?.copyWith(color: Colors.black, fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _fullNameController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Enter your full name',
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Phone Number',
-                                style: Theme.of(context).textTheme.labelLarge
-                                    ?.copyWith(color: Colors.black, fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _phoneController,
-                                keyboardType: TextInputType.phone,
-                                decoration: const InputDecoration(
-                                  hintText: 'e.g. +92 300 1234567',
-                                ),
-                              ),
-                              if (_selectedRole == 'Student') ...[
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Student ID',
-                                  style: Theme.of(context).textTheme.labelLarge
-                                      ?.copyWith(color: Colors.black, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 8),
-                                TextField(
-                                  controller: _studentIdController,
-                                  decoration: const InputDecoration(
-                                    hintText: 'e.g. 2021-CS-123',
-                                  ),
-                                ),
-                              ],
-                            ],
-                            const SizedBox(height: 16),
-                            Text(
-                              'Email',
-                              style: Theme.of(context).textTheme.labelLarge
-                                  ?.copyWith(color: Colors.black, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              onChanged: (_) => setState(() {}),
-                              decoration: InputDecoration(
-                                hintText: 'you@university.edu',
-                                errorText:
-                                    _emailController.text.isEmpty ||
-                                        _isEmailValid
-                                    ? null
-                                    : 'Enter a valid email',
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Password',
-                              style: Theme.of(context).textTheme.labelLarge
-                                  ?.copyWith(color: Colors.black, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: _passwordController,
-                              obscureText: true,
-                              onChanged: (_) => setState(() {}),
-                              decoration: InputDecoration(
-                                hintText: 'Enter your password',
-                                errorText:
-                                    _passwordController.text.isEmpty ||
-                                        _passwordController.text
-                                                .trim()
-                                                .length >=
-                                            6
-                                    ? null
-                                    : 'Use at least 6 characters',
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            FilledButton(
-                              onPressed: _canSubmit
-                                  ? (_isSignUpMode ? _handleSignUp : _handleSignIn)
-                                  : null,
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                backgroundColor: colorScheme.primary,
-                              ),
-                              child: _isSubmitting
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation(
-                                          Colors.white,
-                                        ),
-                                      ),
-                                    )
-                                  : Text(_isSignUpMode ? 'Sign Up' : 'Sign In'),
-                            ),
-                          ],
-                        ),
-                      ),
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
                     ),
-                    Text(
-                      _isSignUpMode
-                          ? 'Choose your role to request access.'
-                          : 'Roles are assigned by the committee. Choose your role to continue.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF6B7A99),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+                  ),
+                  const Text(
+                    'University Final Year Project Portal',
+                    style: TextStyle(color: Colors.white60, fontSize: 14),
+                  ),
+                  const SizedBox(height: 40),
+
+                  _buildAuthForm(accentColor),
+                ],
               ),
             ),
           ),
@@ -532,40 +251,285 @@ class _SignInScreenState extends State<SignInScreen> {
       ),
     );
   }
-}
 
-class _AuthModeChip extends StatelessWidget {
-  const _AuthModeChip({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
+  Widget _buildAuthForm(Color accentColor) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: accentColor.withValues(alpha: 0.3), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _isSignUpMode ? 'Create Account' : 'Login Session',
+            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 24),
+          
+          if (_isSignUpMode) ...[
+            _buildRoleSelector(accentColor),
+            const SizedBox(height: 20),
+            _buildTextField('Full Name', _fullNameController, Icons.person_outline, color: accentColor),
+            const SizedBox(height: 20),
+            if (_signupRole == 'Student') ...[
+              _buildTextField('Student ID', _studentIdController, Icons.numbers_outlined, hint: 'e.g. 2021-CS-123', color: accentColor),
+              const SizedBox(height: 20),
+            ],
+            _buildTextField('Phone Number', _phoneController, Icons.phone_outlined, hint: '+92...', color: accentColor),
+            const SizedBox(height: 20),
+            _buildUniversitySelector(accentColor),
+            const SizedBox(height: 20),
+          ],
 
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
+          _buildTextField('Email Address', _emailController, Icons.email_outlined, color: accentColor),
+          const SizedBox(height: 20),
+          _buildTextField(
+            'Password', 
+            _passwordController, 
+            Icons.lock_outline, 
+            isPassword: true, 
+            color: accentColor,
+            obscureText: _obscurePassword,
+            onToggleVisibility: () => setState(() => _obscurePassword = !_obscurePassword),
+          ),
+          
+          const SizedBox(height: 32),
+          
+          Container(
+            width: double.infinity,
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withValues(alpha: 0.5),
+                  blurRadius: 20,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: FilledButton(
+              onPressed: _isLoading ? null : _handleAuth,
+              style: FilledButton.styleFrom(
+                backgroundColor: accentColor,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              child: _isLoading 
+                ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(_isSignUpMode ? Icons.person_add_rounded : Icons.login_rounded, size: 20),
+                      const SizedBox(width: 12),
+                      Text(_isSignUpMode ? 'Register Now' : 'Login', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ],
+                  ),
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          Center(
+            child: TextButton(
+              onPressed: _handleForgotPassword,
+              child: Text(
+                'Forgot Password?',
+                style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const Expanded(child: Divider(color: AppColors.border)),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text('New to the system?', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              ),
+              const Expanded(child: Divider(color: AppColors.border)),
+            ],
+          ),
+          const SizedBox(height: 24),
+          
+          Center(
+            child: TextButton(
+              onPressed: () => setState(() => _isSignUpMode = !_isSignUpMode),
+              child: Text(
+                _isSignUpMode ? 'Already have an account? Sign In' : 'Need an account? Sign Up',
+                style: TextStyle(color: accentColor, fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? colorScheme.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
+  Widget _buildRoleSelector(Color color) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = (constraints.maxWidth - 12) / 2;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Requested Role', style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: ['Student', 'Admin', 'Supervisor', 'Committee'].map((role) {
+                final isSelected = _signupRole == role;
+                final roleColor = (role == 'Admin' || role == 'Committee') ? AppColors.adminPink : AppColors.studentTeal;
+                return GestureDetector(
+                  onTap: () => setState(() => _signupRole = role),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: itemWidth,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected ? roleColor : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? roleColor : roleColor.withValues(alpha: 0.4),
+                        width: isSelected ? 2 : 1,
+                      ),
+                      boxShadow: isSelected ? [
+                        BoxShadow(color: roleColor.withValues(alpha: 0.3), blurRadius: 10, spreadRadius: -2)
+                      ] : null,
+                    ),
+                    child: Center(
+                      child: Text(
+                        role,
+                        style: TextStyle(
+                          color: isSelected ? Colors.black : roleColor,
+                          fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildUniversitySelector(Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.location_city, size: 16, color: color),
+            const SizedBox(width: 8),
+            Text('University', style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w700)),
+          ],
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF6B7A99),
-            fontWeight: FontWeight.w600,
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.inputBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color, width: 2),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedUniversity,
+              dropdownColor: AppColors.surface,
+              icon: Icon(Icons.arrow_drop_down, color: color),
+              isExpanded: true,
+              style: const TextStyle(color: Colors.black, fontSize: 15),
+              items: _universities.map((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value, style: const TextStyle(color: Colors.black)),
+                );
+              }).toList(),
+              onChanged: (newValue) {
+                setState(() => _selectedUniversity = newValue!);
+              },
+            ),
           ),
         ),
-      ),
+        if (_selectedUniversity == 'Other') ...[
+          const SizedBox(height: 12),
+          _buildTextField('Specify University', _universityController, Icons.edit_note, color: color),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildTextField(
+    String label, 
+    TextEditingController controller, 
+    IconData icon, {
+    bool isPassword = false, 
+    String? hint, 
+    Color color = Colors.white,
+    bool obscureText = false,
+    VoidCallback? onToggleVisibility,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.4),
+                blurRadius: 20,
+              )
+            ],
+          ),
+          child: TextField(
+            controller: controller,
+            obscureText: isPassword ? obscureText : false,
+            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.normal, fontSize: 15), // Clean non-bold font
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(color: Colors.black38),
+              filled: true,
+              fillColor: AppColors.inputBg,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: color, width: 2),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: color, width: 2),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: color, width: 2.5),
+              ),
+              suffixIcon: isPassword 
+                ? IconButton(
+                    icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility, size: 20, color: color),
+                    onPressed: onToggleVisibility,
+                  ) 
+                : null,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

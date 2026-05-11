@@ -10,6 +10,7 @@ class UserProfile {
     this.fullName,
     this.studentId,
     this.phoneNumber,
+    this.university,
   });
 
   final String uid;
@@ -18,6 +19,7 @@ class UserProfile {
   final String? fullName;
   final String? studentId;
   final String? phoneNumber;
+  final String? university;
 
   factory UserProfile.fromMap(
     String uid,
@@ -31,6 +33,7 @@ class UserProfile {
       role: (data['role'] as String?) ?? '',
       fullName: data['fullName'] as String?,
       studentId: data['studentId'] as String?,
+      university: data['university'] as String?,
       phoneNumber: encryptedPhone == null
           ? null
           : _safeDecrypt(crypto, encryptedPhone),
@@ -70,6 +73,7 @@ class UserProfileService {
     String? fullName,
     String? studentId,
     String? phoneNumber,
+    String? university,
     String? phoneEncrypted,
     String? requestedRole,
     String? status,
@@ -80,6 +84,7 @@ class UserProfileService {
       'role': role,
       'fullName': fullName,
       'studentId': studentId,
+      'university': university,
       'phoneEncrypted': finalPhoneEncrypted,
       if (requestedRole != null) 'requestedRole': requestedRole,
       if (status != null) 'status': status,

@@ -1,5 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import 'committee_nav_bar.dart';
 import 'committee_dashboard_screen.dart';
@@ -154,16 +155,15 @@ class _CommitteeVivaSchedulingScreenState
                   Text(
                     'Viva Scheduling',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF14375E),
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.adminPink,
+                          shadows: [const Shadow(color: AppColors.adminPink, blurRadius: 15)],
                         ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
+                  const Text(
                     'Manage and coordinate evaluation dates for all groups.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFF64748B),
-                        ),
+                    style: TextStyle(color: Colors.white60, fontSize: 13),
                   ),
                 ],
               ),
@@ -238,18 +238,16 @@ class _ScheduleCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF14375E).withOpacity(0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
         border: Border.all(
-          color: isScheduled ? const Color(0xFF1E6091).withOpacity(0.1) : const Color(0xFFE2E8F0),
+          color: isScheduled ? AppColors.adminPink.withValues(alpha: 0.4) : AppColors.border,
+          width: 1.5,
         ),
+        boxShadow: [
+          if (isScheduled)
+            BoxShadow(color: AppColors.adminPink.withValues(alpha: 0.1), blurRadius: 15)
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
@@ -257,19 +255,20 @@ class _ScheduleCard extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              color: isScheduled ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
+              color: AppColors.surfaceLight.withValues(alpha: 0.5),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF14375E),
+                      color: AppColors.adminPink.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.adminPink.withValues(alpha: 0.4)),
                     ),
                     child: Text(
                       'GROUP $groupCode',
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: AppColors.adminPink,
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1,
@@ -278,9 +277,9 @@ class _ScheduleCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   if (isScheduled)
-                    const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 18)
+                    const Icon(Icons.check_circle, color: AppColors.success, size: 18)
                   else
-                    const Icon(Icons.pending, color: Color(0xFFF59E0B), size: 18),
+                    const Icon(Icons.pending, color: AppColors.warning, size: 18),
                 ],
               ),
             ),
@@ -295,19 +294,19 @@ class _ScheduleCard extends StatelessWidget {
                         Text(
                           projectTitle,
                           style: const TextStyle(
-                            fontSize: 16,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E293B),
+                            color: Colors.white,
                           ),
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(Icons.people_outline, size: 16, color: Color(0xFF64748B)),
+                            const Icon(Icons.people_outline, size: 16, color: Colors.white60),
                             const SizedBox(width: 6),
                             Text(
                               '$memberCount Members',
-                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                              style: const TextStyle(color: Colors.white60, fontSize: 13),
                             ),
                           ],
                         ),
@@ -315,13 +314,13 @@ class _ScheduleCard extends StatelessWidget {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(Icons.calendar_today, size: 16, color: Color(0xFF1E6091)),
+                              const Icon(Icons.calendar_today, size: 16, color: AppColors.adminPink),
                               const SizedBox(width: 6),
                               Text(
                                 scheduledDate!.toLocal().toString().split(' ')[0],
                                 style: const TextStyle(
-                                  color: Color(0xFF1E6091),
-                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.adminPink,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 13,
                                 ),
                               ),
@@ -335,16 +334,16 @@ class _ScheduleCard extends StatelessWidget {
                   ElevatedButton(
                     onPressed: onSchedule,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isScheduled ? Colors.white : const Color(0xFF14375E),
-                      foregroundColor: isScheduled ? const Color(0xFF14375E) : Colors.white,
+                      backgroundColor: isScheduled ? Colors.transparent : AppColors.adminPink,
+                      foregroundColor: isScheduled ? AppColors.adminPink : Colors.white,
                       elevation: 0,
-                      side: isScheduled ? const BorderSide(color: Color(0xFF14375E)) : null,
+                      side: const BorderSide(color: AppColors.adminPink),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                     child: Text(
                       isScheduled ? 'RESCHEDULE' : 'SCHEDULE',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
                     ),
                   ),
                 ],

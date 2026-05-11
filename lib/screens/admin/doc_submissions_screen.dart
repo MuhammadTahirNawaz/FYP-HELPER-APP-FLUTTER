@@ -1,5 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import 'admin_nav_bar.dart';
 
@@ -13,7 +14,7 @@ class DocSubmissionsScreen extends StatelessWidget {
       case 'approved': return const Color(0xFF16A34A);
       case 'pending': return const Color(0xFFF59E0B);
       case 'needs review': return const Color(0xFFDC2626);
-      default: return const Color(0xFF6B7A99);
+      default: return AppColors.slateText;
     }
   }
 
@@ -90,7 +91,7 @@ class DocSubmissionsScreen extends StatelessWidget {
               return Card(
                 child: ListTile(
                   leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFEDF1F9),
+                    backgroundColor: AppColors.selectedTile,
                     child: Icon(Icons.description, color: Color(0xFF14375E)),
                   ),
                   title: Text(title,
@@ -112,7 +113,7 @@ class DocSubmissionsScreen extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.12),
+                        color: color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(status,
@@ -143,7 +144,7 @@ class _StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(label,
@@ -152,3 +153,4 @@ class _StatusChip extends StatelessWidget {
     );
   }
 }
+

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import 'supervisor_nav_bar.dart';
 import 'supervisor_notifications_settings_screen.dart';
@@ -105,7 +106,7 @@ class _SettingsTile extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFFEDF1F9),
+          backgroundColor: AppColors.selectedTile,
           child: Icon(icon, color: const Color(0xFF14375E)),
         ),
         title: Text(title),
@@ -116,3 +117,4 @@ class _SettingsTile extends StatelessWidget {
     );
   }
 }
+

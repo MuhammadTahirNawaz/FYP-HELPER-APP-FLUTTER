@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../theme/app_colors.dart';
 
 import '../shared/messages_screen.dart';
 import 'committee_nav_bar.dart';
@@ -19,12 +20,30 @@ class CommitteeDashboardScreen extends StatefulWidget {
 class _CommitteeDashboardScreenState extends State<CommitteeDashboardScreen> {
   final DatabaseReference _groupsRef =
       FirebaseDatabase.instance.ref('groups');
-  final DatabaseReference _evaluationRef =
-      FirebaseDatabase.instance.ref('admin/evaluationSchedule');
-  final DatabaseReference _documentsRef =
-      FirebaseDatabase.instance.ref('documents_by_role/Committee');
+  DatabaseReference get _evaluationRef =>
+      FirebaseDatabase.instance.ref('admin/universities/${_university ?? "default"}/evaluationSchedule');
+  DatabaseReference get _documentsRef =>
+      FirebaseDatabase.instance.ref('admin/universities/${_university ?? "default"}/documents_by_role/Committee');
 
   _CommitteeSection _currentSection = _CommitteeSection.dashboard;
+  String? _university;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUniversity();
+  }
+
+  Future<void> _fetchUniversity() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final snap = await FirebaseDatabase.instance.ref('users/${user.uid}').get();
+      if (snap.exists && snap.value is Map) {
+        final data = Map<String, dynamic>.from(snap.value as Map);
+        if (mounted) setState(() => _university = data['university'] as String?);
+      }
+    }
+  }
 
   void _selectSection(_CommitteeSection section) {
     setState(() => _currentSection = section);
@@ -37,7 +56,7 @@ class _CommitteeDashboardScreenState extends State<CommitteeDashboardScreen> {
       appBar: AppBar(
         elevation: 0,
         centerTitle: false,
-        backgroundColor: const Color(0xFF000000),
+        backgroundColor: AppColors.black,
         foregroundColor: Colors.white,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,7 +86,7 @@ class _CommitteeDashboardScreenState extends State<CommitteeDashboardScreen> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF000000), Color(0xFF1E293B)],
+              colors: [AppColors.black, AppColors.surfaceStrong],
             ),
           ),
         ),
@@ -88,6 +107,7 @@ class _CommitteeDashboardScreenState extends State<CommitteeDashboardScreen> {
           groupsRef: _groupsRef,
           evaluationRef: _evaluationRef,
           documentsRef: _documentsRef,
+          university: _university,
         ),
       ),
       bottomNavigationBar: const CommitteeNavBar(selectedIndex: 0),
@@ -103,12 +123,14 @@ class _CommitteeSectionBody extends StatelessWidget {
     required this.groupsRef,
     required this.evaluationRef,
     required this.documentsRef,
+    this.university,
   });
 
   final _CommitteeSection section;
   final DatabaseReference groupsRef;
   final DatabaseReference evaluationRef;
   final DatabaseReference documentsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -117,17 +139,29 @@ class _CommitteeSectionBody extends StatelessWidget {
         return _CommitteeDashboardHome(
           groupsRef: groupsRef,
           evaluationRef: evaluationRef,
+          university: university,
         );
       case _CommitteeSection.groups:
-        return _GroupsViewSection(groupsRef: groupsRef);
+        return _GroupsViewSection(groupsRef: groupsRef, university: university);
       case _CommitteeSection.proposals:
-        return _ProposalsViewSection(groupsRef: groupsRef);
+        return _ProposalsViewSection(groupsRef: groupsRef, university: university);
+      case _CommitteeSection.reviews:
+        return _ProposalReviewSection(
+          groupsRef: groupsRef,
+          university: university,
+        );
+      case _CommitteeSection.viva:
+        return _VivaSchedulingSection(
+          groupsRef: groupsRef,
+          evaluationRef: evaluationRef,
+          university: university,
+        );
       case _CommitteeSection.documents:
-        return _DocumentsViewSection(documentsRef: documentsRef);
+        return _DocumentsViewSection(documentsRef: documentsRef, university: university);
       case _CommitteeSection.progress:
-        return _GroupProgressSection(groupsRef: groupsRef);
+        return _GroupProgressSection(groupsRef: groupsRef, university: university);
       case _CommitteeSection.schedule:
-        return _EvaluationScheduleSection(groupsRef: groupsRef);
+        return _EvaluationScheduleSection(groupsRef: groupsRef, university: university);
       case _CommitteeSection.messages:
         return const MessagesScreen(isAdmin: false);
     }
@@ -161,7 +195,7 @@ class _CommitteeDrawer extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFF000000), Color(0xFF1E293B)],
+                  colors: [AppColors.black, AppColors.surfaceStrong],
                 ),
               ),
               child: Align(
@@ -173,7 +207,7 @@ class _CommitteeDrawer extends StatelessWidget {
                     const CircleAvatar(
                       radius: 22,
                       backgroundColor: Colors.white,
-                      child: Icon(Icons.fact_check, color: Color(0xFF14375E)),
+                      child: Icon(Icons.fact_check, color: AppColors.deepBlue),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -203,12 +237,12 @@ class _CommitteeDrawer extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   tileColor: section == selected
-                      ? const Color(0xFFEDF1F9)
+                      ? AppColors.selectedTile
                       : Colors.transparent,
                   leading: Icon(
                     section.icon,
                     color: section == selected
-                        ? const Color(0xFF1E6091)
+                        ? AppColors.primaryBlue
                         : null,
                   ),
                   title: Text(
@@ -218,7 +252,7 @@ class _CommitteeDrawer extends StatelessWidget {
                           ? FontWeight.w700
                           : FontWeight.w500,
                       color: section == selected
-                          ? const Color(0xFF14375E)
+                          ? AppColors.deepBlue
                           : null,
                     ),
                   ),
@@ -239,10 +273,12 @@ class _CommitteeDashboardHome extends StatelessWidget {
   const _CommitteeDashboardHome({
     required this.groupsRef,
     required this.evaluationRef,
+    this.university,
   });
 
   final DatabaseReference groupsRef;
   final DatabaseReference evaluationRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -250,9 +286,14 @@ class _CommitteeDashboardHome extends StatelessWidget {
       stream: groupsRef.onValue,
       builder: (context, groupsSnapshot) {
         final groupsData = groupsSnapshot.data?.snapshot.value;
-        final groupsMap = groupsData is Map
+        final allGroups = groupsData is Map
             ? Map<String, dynamic>.from(groupsData)
             : <String, dynamic>{};
+            
+        // Filter by University
+        final groupsMap = university == null 
+          ? allGroups 
+          : Map.fromEntries(allGroups.entries.where((e) => (e.value as Map)['university'] == university));
 
         final totalGroups = groupsMap.length;
         final pendingProposals = groupsMap.values
@@ -292,7 +333,7 @@ class _CommitteeDashboardHome extends StatelessWidget {
                   label: 'Total Groups',
                   value: totalGroups.toString(),
                   icon: Icons.groups,
-                  accent: const Color(0xFF1E6091),
+                  accent: AppColors.primaryBlue,
                 ),
                 _StatCard(
                   label: 'Pending Proposals',
@@ -403,7 +444,7 @@ class _SectionBanner extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF14375E), Color(0xFF1E6091)],
+          colors: [AppColors.deepBlue, AppColors.primaryBlue],
         ),
       ),
       child: Row(
@@ -506,14 +547,14 @@ class _StatCard extends StatelessWidget {
               value,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF14375E),
+                    color: AppColors.deepBlue,
                   ),
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF6B7A99),
+                    color: AppColors.slateText,
                     fontWeight: FontWeight.w600,
                   ),
             ),
@@ -556,9 +597,10 @@ class _ActionPill extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _GroupsViewSection extends StatelessWidget {
-  const _GroupsViewSection({required this.groupsRef});
+  const _GroupsViewSection({required this.groupsRef, this.university});
 
   final DatabaseReference groupsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -604,7 +646,7 @@ class _GroupsViewSection extends StatelessWidget {
                   ),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: const Color(0xFFEDF1F9),
+                      backgroundColor: AppColors.selectedTile,
                       child: Text(group.code[0]),
                     ),
                     title: Text('Group ${group.code}'),
@@ -630,9 +672,10 @@ class _GroupsViewSection extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _ProposalsViewSection extends StatelessWidget {
-  const _ProposalsViewSection({required this.groupsRef});
+  const _ProposalsViewSection({required this.groupsRef, this.university});
 
   final DatabaseReference groupsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -709,9 +752,10 @@ class _ProposalsViewSection extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _DocumentsViewSection extends StatefulWidget {
-  const _DocumentsViewSection({required this.documentsRef});
+  const _DocumentsViewSection({required this.documentsRef, this.university});
 
   final DatabaseReference documentsRef;
+  final String? university;
 
   @override
   State<_DocumentsViewSection> createState() => _DocumentsViewSectionState();
@@ -773,13 +817,13 @@ class _DocumentsViewSectionState extends State<_DocumentsViewSection> {
               ),
               child: ListTile(
                 leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFEDF1F9),
-                  child: Icon(Icons.description, color: Color(0xFF14375E)),
+                  backgroundColor: AppColors.selectedTile,
+                  child: Icon(Icons.description, color: AppColors.deepBlue),
                 ),
                 title: Text(doc['title'], style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(doc['description'].isNotEmpty ? doc['description'] : doc['fileName']),
                 trailing: IconButton(
-                  icon: const Icon(Icons.open_in_new, color: Color(0xFF1E6091)),
+                  icon: const Icon(Icons.open_in_new, color: AppColors.primaryBlue),
                   onPressed: () async {
                     if (doc['fileUrl'].isNotEmpty) {
                       final url = Uri.parse(doc['fileUrl']);
@@ -805,9 +849,10 @@ class _DocumentsViewSectionState extends State<_DocumentsViewSection> {
 // ---------------------------------------------------------------------------
 
 class _EvaluationScheduleSection extends StatelessWidget {
-  const _EvaluationScheduleSection({required this.groupsRef});
+  const _EvaluationScheduleSection({required this.groupsRef, this.university});
 
   final DatabaseReference groupsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -821,7 +866,7 @@ class _EvaluationScheduleSection extends StatelessWidget {
             label: const Text('Manage Viva Schedule'),
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 50),
-              backgroundColor: const Color(0xFF1E6091),
+              backgroundColor: AppColors.primaryBlue,
               foregroundColor: Colors.white,
             ),
           ),
@@ -874,13 +919,13 @@ class _EvaluationScheduleSection extends StatelessWidget {
                       ),
                       child: ListTile(
                         leading: const CircleAvatar(
-                          backgroundColor: Color(0xFFEDF1F9),
-                          child: Icon(Icons.event, color: Color(0xFF1E6091)),
+                          backgroundColor: AppColors.selectedTile,
+                          child: Icon(Icons.event, color: AppColors.primaryBlue),
                         ),
                         title: Text('Group ${entry.key} - ${groupData['projectTitle'] ?? 'Untitled'}'),
                         subtitle: Text(
                           'Date: ${vivaDate.toLocal().toString().split(' ')[0]}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF14375E)),
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.deepBlue),
                         ),
                         trailing: const Icon(Icons.chevron_right),
                       ),
@@ -899,9 +944,10 @@ class _EvaluationScheduleSection extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _GroupProgressSection extends StatelessWidget {
-  const _GroupProgressSection({required this.groupsRef});
+  const _GroupProgressSection({required this.groupsRef, this.university});
 
   final DatabaseReference groupsRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -1022,7 +1068,7 @@ class _GroupProgressSection extends StatelessWidget {
                   ),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: const Color(0xFFEDF1F9),
+                      backgroundColor: AppColors.selectedTile,
                       child: Text(group.code[0]),
                     ),
                     title: Text('Group ${group.code}'),
@@ -1036,12 +1082,12 @@ class _GroupProgressSection extends StatelessWidget {
                           children: [
                             Chip(
                               label: Text(group.status),
-                              backgroundColor: const Color(0xFFEDF1F9),
+                              backgroundColor: AppColors.selectedTile,
                             ),
                             const SizedBox(width: 8),
                             Chip(
                               label: Text(group.proposalStatus),
-                              backgroundColor: const Color(0xFFEDF1F9),
+                              backgroundColor: AppColors.selectedTile,
                             ),
                           ],
                         ),
@@ -1147,6 +1193,8 @@ enum _CommitteeSection {
   dashboard('Dashboard', Icons.dashboard),
   groups('All Groups', Icons.groups),
   proposals('Proposals', Icons.fact_check),
+  reviews('Proposal Reviews', Icons.rate_review),
+  viva('Viva Scheduling', Icons.event_available),
   documents('Documents', Icons.folder),
   progress('Progress', Icons.trending_up),
   schedule('Schedule', Icons.event),
@@ -1156,4 +1204,27 @@ enum _CommitteeSection {
 
   final String title;
   final IconData icon;
+}
+
+class _ProposalReviewSection extends StatelessWidget {
+  const _ProposalReviewSection({required this.groupsRef, this.university});
+  final DatabaseReference groupsRef;
+  final String? university;
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(child: Text('Proposal Review Module (Scoped by University)', style: TextStyle(color: Colors.white70)));
+  }
+}
+
+class _VivaSchedulingSection extends StatelessWidget {
+  const _VivaSchedulingSection({required this.groupsRef, required this.evaluationRef, this.university});
+  final DatabaseReference groupsRef;
+  final DatabaseReference evaluationRef;
+  final String? university;
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(child: Text('Viva Scheduling Module (Scoped by University)', style: TextStyle(color: Colors.white70)));
+  }
 }

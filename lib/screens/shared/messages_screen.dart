@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({
@@ -199,103 +200,149 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   Widget _buildThreadList(List<_Thread> threads) {
     if (threads.isEmpty) {
-      return const Center(child: Text('No conversations yet.'));
+      return const Center(child: Text('No conversations yet.', style: TextStyle(color: Colors.white60)));
     }
 
-    return ListView(
+    return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      children: threads
-          .map(
-            (thread) => Card(
-              elevation: 0,
-              margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: Color(0xFFE6E6E6)),
-              ),
-              child: ListTile(
-                title: Text(thread.userEmail),
-                subtitle: Text(
-                  thread.lastMessage.isEmpty
-                      ? 'No messages yet.'
-                      : thread.lastMessage,
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => setState(() => _selectedThreadId = thread.id),
-              ),
+      itemCount: threads.length,
+      itemBuilder: (context, index) {
+        final thread = threads[index];
+        final identityColor = widget.isAdmin ? AppColors.adminPink : AppColors.studentTeal;
+        
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: identityColor.withValues(alpha: 0.1),
+              child: Icon(Icons.person, color: identityColor),
             ),
-          )
-          .toList(),
-    );
-  }
-
-  Widget _buildMessageList(String threadId) {
-    return StreamBuilder<DatabaseEvent>(
-      stream: _itemsRef.child(threadId).onValue,
-      builder: (context, snapshot) {
-        final data = snapshot.data?.snapshot.value;
-        final messages = _MessageItem.fromSnapshot(data);
-
-        if (messages.isEmpty) {
-          return const Center(child: Text('No messages yet.'));
-        }
-
-        return ListView.builder(
-          shrinkWrap: true,
-          itemCount: messages.length,
-          itemBuilder: (context, index) {
-            final message = messages[index];
-            final isMe =
-                message.senderUid == FirebaseAuth.instance.currentUser?.uid;
-            return Align(
-              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 6),
-                padding: const EdgeInsets.all(12),
-                constraints: const BoxConstraints(maxWidth: 280),
-                decoration: BoxDecoration(
-                  color: isMe
-                      ? Theme.of(context).colorScheme.primary.withOpacity(0.12)
-                      : const Color(0xFFF3F3F3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(message.text),
-              ),
-            );
-          },
+            title: Text(
+              thread.userEmail,
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            subtitle: Text(
+              thread.lastMessage.isEmpty ? 'No messages yet.' : thread.lastMessage,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white60, fontSize: 13),
+            ),
+            trailing: const Icon(Icons.chevron_right, color: Colors.white24),
+            onTap: () => setState(() => _selectedThreadId = thread.id),
+          ),
         );
       },
     );
   }
 
+  Widget _buildMessageList(String threadId) {
+    return Expanded(
+      child: StreamBuilder<DatabaseEvent>(
+        stream: _itemsRef.child(threadId).onValue,
+        builder: (context, snapshot) {
+          final data = snapshot.data?.snapshot.value;
+          final messages = _MessageItem.fromSnapshot(data);
+
+          if (messages.isEmpty) {
+            return const Center(child: Text('No messages yet.', style: TextStyle(color: Colors.white60)));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            itemCount: messages.length,
+            itemBuilder: (context, index) {
+              final message = messages[index];
+              final isMe = message.senderUid == FirebaseAuth.instance.currentUser?.uid;
+              final identityColor = widget.isAdmin ? AppColors.adminPink : AppColors.studentTeal;
+              
+              return Align(
+                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  padding: const EdgeInsets.all(14),
+                  constraints: const BoxConstraints(maxWidth: 300),
+                  decoration: BoxDecoration(
+                    color: isMe ? identityColor : AppColors.surface,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20),
+                      topRight: const Radius.circular(20),
+                      bottomLeft: Radius.circular(isMe ? 20 : 0),
+                      bottomRight: Radius.circular(isMe ? 0 : 20),
+                    ),
+                    boxShadow: isMe ? [
+                      BoxShadow(color: identityColor.withValues(alpha: 0.2), blurRadius: 10)
+                    ] : [],
+                    border: isMe ? null : Border.all(color: AppColors.border),
+                  ),
+                  child: Text(
+                    message.text,
+                    style: TextStyle(
+                      color: isMe ? Colors.white : Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildComposer(String threadId) {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _messageController,
-            minLines: 1,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              hintText: 'Type a message',
+    final identityColor = widget.isAdmin ? AppColors.adminPink : AppColors.studentTeal;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _messageController,
+              minLines: 1,
+              maxLines: 3,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Type a message...',
+                hintStyle: const TextStyle(color: Colors.white30),
+                filled: true,
+                fillColor: AppColors.bg,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        FilledButton(
-          onPressed: _sending
-              ? null
-              : () {
-                  final text = _messageController.text.trim();
-                  if (text.isEmpty) {
-                    return;
-                  }
-                  _sendMessage(threadId, text);
-                },
-          child: const Text('Send'),
-        ),
-      ],
+          const SizedBox(width: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: identityColor,
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: identityColor.withValues(alpha: 0.3), blurRadius: 10)],
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.send, color: Colors.white, size: 20),
+              onPressed: _sending
+                  ? null
+                  : () {
+                      final text = _messageController.text.trim();
+                      if (text.isEmpty) return;
+                      _sendMessage(threadId, text);
+                    },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -303,15 +350,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return const Center(child: Text('Please sign in.'));
+      return const Center(child: Text('Please sign in.', style: TextStyle(color: Colors.white)));
     }
 
-    final content = StreamBuilder<DatabaseEvent>(
+    return StreamBuilder<DatabaseEvent>(
       stream: _threadsRef.onValue,
       builder: (context, snapshot) {
         var threads = _Thread.fromSnapshot(snapshot.data?.snapshot.value);
-        
-        // For non-admin users, filter to only their conversations
         if (!widget.isAdmin) {
           threads = threads
               .where((thread) =>
@@ -320,67 +365,105 @@ class _MessagesScreenState extends State<MessagesScreen> {
               .toList();
         }
 
-        if (!widget.isAdmin && threads.isNotEmpty && _selectedThreadId == null) {
-          _selectedThreadId = threads.first.id;
-        }
-
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  widget.isAdmin ? 'Conversations' : 'Messages',
-                  style: Theme.of(context).textTheme.titleMedium,
+        Widget content;
+        if (_selectedThreadId != null) {
+          final thread = threads.firstWhere((t) => t.id == _selectedThreadId);
+          content = Column(
+            children: [
+              // Chat Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  border: Border(bottom: BorderSide(color: AppColors.border)),
                 ),
-                FilledButton.icon(
-                  onPressed: widget.isAdmin ? _startAdminThread : _startUserThread,
-                  icon: const Icon(Icons.add),
-                  label: const Text('New'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (threads.isEmpty && !widget.isAdmin)
-              Center(
-                child: Column(
+                child: Row(
                   children: [
-                    const Text('No messages yet.'),
-                    const SizedBox(height: 12),
-                    OutlinedButton(
-                      onPressed: _startUserThread,
-                      child: const Text('Start Conversation'),
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white70),
+                      onPressed: () => setState(() => _selectedThreadId = null),
+                    ),
+                    const SizedBox(width: 8),
+                    CircleAvatar(
+                      backgroundColor: widget.isAdmin ? AppColors.adminPink.withValues(alpha: 0.1) : AppColors.studentTeal.withValues(alpha: 0.1),
+                      child: Icon(Icons.person, color: widget.isAdmin ? AppColors.adminPink : AppColors.studentTeal),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            thread.userEmail,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                          const Text('Online', style: TextStyle(color: Colors.green, fontSize: 11)),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              )
-            else
-              _buildThreadList(threads),
-            const SizedBox(height: 16),
-            if (_selectedThreadId != null) ...[
-              Text(
-                'Conversation',
-                style: Theme.of(context).textTheme.titleSmall,
               ),
-              const SizedBox(height: 8),
               _buildMessageList(_selectedThreadId!),
-              const SizedBox(height: 12),
               _buildComposer(_selectedThreadId!),
-            ] else
-              const Text('Select a conversation to view messages.'),
-          ],
+            ],
+          );
+        } else {
+          content = ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    widget.isAdmin ? 'Conversations' : 'Messages',
+                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+                  ),
+                  IconButton(
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Icon(Icons.add, color: widget.isAdmin ? AppColors.adminPink : AppColors.studentTeal, size: 20),
+                    ),
+                    onPressed: widget.isAdmin ? _startAdminThread : _startUserThread,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              if (threads.isEmpty)
+                Center(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 64),
+                      Icon(Icons.forum_outlined, size: 64, color: AppColors.border),
+                      const SizedBox(height: 16),
+                      const Text('No messages yet.', style: TextStyle(color: Colors.white60)),
+                    ],
+                  ),
+                )
+              else
+                _buildThreadList(threads),
+            ],
+          );
+        }
+
+        if (widget.showAppBar && _selectedThreadId == null) {
+          return Scaffold(
+            backgroundColor: AppColors.bg,
+            appBar: AppBar(title: const Text('Messages')),
+            body: content,
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: AppColors.bg,
+          body: SafeArea(child: content),
         );
       },
-    );
-
-    if (!widget.showAppBar) {
-      return content;
-    }
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Messages')),
-      body: content,
     );
   }
 

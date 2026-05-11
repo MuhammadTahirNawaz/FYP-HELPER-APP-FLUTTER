@@ -1,5 +1,7 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 class AdminManageUsersScreen extends StatefulWidget {
   const AdminManageUsersScreen({super.key});
@@ -15,6 +17,24 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
   String _filterRole = 'All';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  String? _adminUniversity;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAdminUniversity();
+  }
+
+  Future<void> _fetchAdminUniversity() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final snap = await _usersRef.child(user.uid).get();
+      if (snap.exists && snap.value is Map) {
+        final data = Map<String, dynamic>.from(snap.value as Map);
+        setState(() => _adminUniversity = data['university'] as String?);
+      }
+    }
+  }
 
   static const _roles = ['All', 'Student', 'Supervisor', 'Committee', 'Admin', 'Pending'];
 
@@ -35,11 +55,11 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
 
   Color _roleColor(String role) {
     switch (role) {
-      case 'Student': return const Color(0xFF2563EB);
-      case 'Supervisor': return const Color(0xFF7C3AED);
-      case 'Committee': return const Color(0xFF0891B2);
-      case 'Admin': return const Color(0xFFDC2626);
-      default: return const Color(0xFF6B7A99);
+      case 'Student': return AppColors.studentTeal;
+      case 'Supervisor': return AppColors.studentTeal;
+      case 'Committee': return AppColors.adminPink;
+      case 'Admin': return AppColors.adminPink;
+      default: return Colors.white60;
     }
   }
 
@@ -52,7 +72,8 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(name),
+        backgroundColor: AppColors.surface,
+        title: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,6 +81,8 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
             if (email.isNotEmpty) _InfoRow(label: 'Email', value: email),
             _InfoRow(label: 'Role', value: role),
             _InfoRow(label: 'Status', value: status),
+            if (user['university'] != null)
+              _InfoRow(label: 'University', value: user['university'].toString()),
             if (user['requestedRole'] != null)
               _InfoRow(label: 'Requested Role', value: user['requestedRole'].toString()),
           ],
@@ -121,10 +144,13 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('Manage Users'),
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        title: const Text('Manage Users', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back, color: AppColors.adminPink),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
@@ -193,8 +219,12 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                   if (e.value is! Map) return false;
                   final user = Map<String, dynamic>.from(e.value as Map);
                   final role = (user['role'] as String?) ?? '';
-                  final name = ((user['displayName'] as String?) ?? '').toLowerCase();
+                  final university = (user['university'] as String?) ?? '';
+                  final name = ((user['displayName'] as String?) ?? (user['fullName'] as String?) ?? '').toLowerCase();
                   final email = ((user['email'] as String?) ?? '').toLowerCase();
+
+                  // Filter by Admin's University
+                  if (_adminUniversity != null && university != _adminUniversity) return false;
 
                   final roleMatch = _filterRole == 'All' || role == _filterRole;
                   final searchMatch = _searchQuery.isEmpty ||
@@ -236,22 +266,28 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
                     return Card(
+                      color: AppColors.surface.withValues(alpha: 0.6),
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: _roleColor(role).withValues(alpha: 0.3)),
+                      ),
                       child: ListTile(
                         contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         leading: CircleAvatar(
                           backgroundColor: _roleColor(role).withOpacity(0.12),
                           child: Text(
                             initial,
                             style: TextStyle(
                               color: _roleColor(role),
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
                         ),
                         title: Text(
                           name,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+                          style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,16 +377,16 @@ class _InfoRow extends StatelessWidget {
             child: Text(
               '$label:',
               style: const TextStyle(
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.bold,
                 fontSize: 13,
-                color: Color(0xFF6B7A99),
+                color: Colors.white60,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF14375E)),
+              style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
             ),
           ),
         ],

@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import '../../data/roles.dart';
 import 'admin_nav_bar.dart';
@@ -16,11 +18,29 @@ class AddUserScreen extends StatefulWidget {
 class _AddUserScreenState extends State<AddUserScreen> {
   final DatabaseReference _usersRef =
       FirebaseDatabase.instance.ref('users');
-  String _selectedRole = kUserRoles.first;
+  String? _adminUniversity;
+  final Map<String, String> _roleSelections = {};
   bool _isSubmitting = false;
 
   bool get _canSubmit {
     return !_isSubmitting;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAdminUniversity();
+  }
+
+  Future<void> _fetchAdminUniversity() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final snap = await FirebaseDatabase.instance.ref('users/${user.uid}').get();
+      if (snap.exists && snap.value is Map) {
+        final data = Map<String, dynamic>.from(snap.value as Map);
+        if (mounted) setState(() => _adminUniversity = data['university'] as String?);
+      }
+    }
   }
 
   List<String> get _provisionableRoles {
@@ -98,7 +118,11 @@ class _AddUserScreenState extends State<AddUserScreen> {
                       Map<String, dynamic>.from(entry.value as Map),
                     ),
                   )
-                  .where((user) => user.role == 'Pending')
+                  .where((user) => 
+                      user.role == 'Pending' && 
+                      _adminUniversity != null && 
+                      user.university == _adminUniversity
+                  )
                   .toList();
 
               if (pending.isEmpty) {
@@ -121,7 +145,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                         ),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: const Color(0xFFEDF1F9),
+                            backgroundColor: AppColors.selectedTile,
                             child: Text(user.email.substring(0, 1)),
                           ),
                           title: Text(user.email),
@@ -134,7 +158,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               DropdownButton<String>(
-                                value: _selectedRole,
+                                value: _roleSelections[user.uid] ?? user.requestedRole ?? 'Student',
                                 items: _provisionableRoles
                                     .map(
                                       (role) => DropdownMenuItem<String>(
@@ -149,7 +173,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                                         if (value == null) {
                                           return;
                                         }
-                                        setState(() => _selectedRole = value);
+                                        setState(() => _roleSelections[user.uid] = value);
                                       },
                               ),
                               const SizedBox(width: 8),
@@ -160,7 +184,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                                     ? null
                                     : () => _approveUser(
                                           user.uid,
-                                          _selectedRole,
+                                          _roleSelections[user.uid] ?? user.requestedRole ?? 'Student',
                                         ),
                               ),
                             ],
@@ -184,12 +208,14 @@ class _PendingUser {
     required this.uid,
     required this.email,
     required this.role,
+    this.university,
     this.requestedRole,
   });
 
   final String uid;
   final String email;
   final String role;
+  final String? university;
   final String? requestedRole;
 
   factory _PendingUser.fromMap(String uid, Map<String, dynamic> data) {
@@ -197,7 +223,9 @@ class _PendingUser {
       uid: uid,
       email: (data['email'] as String?) ?? '',
       role: (data['role'] as String?) ?? '',
+      university: data['university'] as String?,
       requestedRole: data['requestedRole'] as String?,
     );
   }
 }
+

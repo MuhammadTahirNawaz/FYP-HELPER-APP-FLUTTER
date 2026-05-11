@@ -3,6 +3,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'theme/app_colors.dart';
 
 import 'firebase_options.dart';
 
@@ -52,6 +53,7 @@ import 'screens/supervisor/supervisor_progress_reports_screen.dart';
 import 'screens/supervisor/supervisor_security_settings_screen.dart';
 import 'screens/supervisor/supervisor_settings_screen.dart';
 import 'screens/shared/documents_screen.dart';
+import 'screens/shared/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -88,22 +90,23 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // ── Design tokens ──────────────────────────────────────────────────────────
-    // Minimalist Sleek Light Theme (Inspired by User Image)
-    const Color bgColor      = Color(0xFFF8F9FA); // Soft off-white
-    const Color surfaceColor = Color(0xFFFFFFFF); // Pure white cards
-    const Color primaryDark  = Color(0xFF000000); // Bold black titles
-    const Color primaryMid   = Color(0xFF111827); // Deep slate grey
-    const Color accentColor  = Color(0xFF000000); // Pitch black accents
-    const Color labelGrey    = Color(0xFF6B7280); // Muted grey text
-    const Color borderColor  = Color(0xFFE5E7EB); // Subtle borders
+    // Neon Cyberpunk Palette
+    const Color bgColor          = AppColors.bg;
+    const Color surfaceColor     = AppColors.surface;
+    const Color adminColor       = AppColors.adminPink;
+    const Color studentColor     = AppColors.studentTeal;
+    const Color textPrimary      = AppColors.textPrimary;
+    const Color textSecondary    = AppColors.textSecondary;
+    const Color borderColor      = AppColors.border;
 
-    final colorScheme = ColorScheme.light(
-      primary:         accentColor,
-      secondary:       primaryMid,
+    final colorScheme = ColorScheme.dark(
+      primary:         studentColor, // Default to student teal
+      secondary:       adminColor,   // Admin pink
       surface:         surfaceColor,
-      onPrimary:       Colors.white,
-      onSurface:       primaryDark,
+      onPrimary:       bgColor,
+      onSurface:       textPrimary,
       outline:         borderColor,
+      error:           AppColors.error,
     );
 
     return MaterialApp(
@@ -111,154 +114,102 @@ class MainApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: colorScheme,
         useMaterial3: true,
+        brightness: Brightness.dark,
         scaffoldBackgroundColor: bgColor,
-        fontFamily: GoogleFonts.inter().fontFamily,
-        textTheme: GoogleFonts.interTextTheme().copyWith(
-          displayLarge: GoogleFonts.inter(fontSize: 32, fontWeight: FontWeight.w700, color: primaryDark),
-          titleLarge:   GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700, color: primaryDark),
-          titleMedium:  GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: primaryDark),
-          titleSmall:   GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: primaryDark),
-          bodyLarge:    GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w400, color: const Color(0xFFF1F5F9)),
-          bodyMedium:   GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w400, color: labelGrey),
-          bodySmall:    GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400, color: labelGrey),
-          labelLarge:   GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: primaryMid),
+        fontFamily: GoogleFonts.outfit().fontFamily, // Switched to Outfit for a more modern tech look
+        textTheme: GoogleFonts.outfitTextTheme().copyWith(
+          displayLarge: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w900, color: textPrimary, letterSpacing: -1),
+          titleLarge:   GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w800, color: textPrimary, letterSpacing: -0.5),
+          titleMedium:  GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700, color: textPrimary),
+          titleSmall:   GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: textPrimary),
+          bodyLarge:    GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w500, color: textPrimary),
+          bodyMedium:   GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500, color: textSecondary),
+          bodySmall:    GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w500, color: textSecondary),
         ),
         appBarTheme: AppBarTheme(
-          backgroundColor: bgColor,
-          foregroundColor: primaryDark,
+          backgroundColor: Colors.transparent,
+          foregroundColor: textPrimary,
           elevation: 0,
-          surfaceTintColor: Colors.transparent,
-          shadowColor: Colors.transparent,
           centerTitle: true,
-          titleTextStyle: GoogleFonts.inter(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: primaryDark,
+          titleTextStyle: GoogleFonts.outfit(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: textPrimary,
           ),
-          iconTheme: const IconThemeData(color: primaryDark),
+          iconTheme: const IconThemeData(color: textPrimary),
         ),
         cardTheme: CardThemeData(
-          color: surfaceColor,
+          color: surfaceColor.withValues(alpha: 0.7),
           elevation: 0,
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: borderColor, width: 1),
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: borderColor, width: 1.5),
           ),
-          shadowColor: const Color(0x18143758),
-        ),
-        listTileTheme: const ListTileThemeData(
-          iconColor: primaryDark,
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          tileColor: Colors.transparent,
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: surfaceColor,
+          fillColor: AppColors.surfaceLight.withValues(alpha: 0.3),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             borderSide: const BorderSide(color: borderColor),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             borderSide: const BorderSide(color: borderColor),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: primaryMid, width: 2),
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: studentColor, width: 2),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          hintStyle: GoogleFonts.inter(color: labelGrey, fontSize: 14),
-          labelStyle: GoogleFonts.inter(color: labelGrey, fontSize: 14),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          hintStyle: GoogleFonts.outfit(color: textSecondary.withValues(alpha: 0.5), fontSize: 14),
+          labelStyle: GoogleFonts.outfit(color: textSecondary, fontSize: 14, fontWeight: FontWeight.w600),
+          floatingLabelStyle: GoogleFonts.outfit(color: studentColor, fontSize: 12, fontWeight: FontWeight.w700),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            backgroundColor: primaryDark,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            backgroundColor: studentColor,
+            foregroundColor: bgColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
-            elevation: 0,
-          ).copyWith(
-            overlayColor: WidgetStateProperty.all(Colors.white12),
+            textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 16),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-            foregroundColor: primaryDark,
-            side: const BorderSide(color: primaryDark, width: 1.5),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            textStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
+            foregroundColor: textPrimary,
+            side: const BorderSide(color: borderColor, width: 2),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 15),
           ),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: primaryMid,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            textStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
-          ),
-        ),
-        chipTheme: ChipThemeData(
-          backgroundColor: const Color(0xFFE8EEF8),
-          labelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: primaryDark),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-          side: BorderSide.none,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        ),
-        dividerTheme: const DividerThemeData(
-          color: borderColor,
-          thickness: 1,
-          space: 24,
         ),
         navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: surfaceColor,
-          elevation: 0,
-          surfaceTintColor: Colors.transparent,
-          shadowColor: const Color(0x22000000),
-          indicatorColor: primaryMid.withOpacity(0.2),
+          backgroundColor: surfaceColor.withValues(alpha: 0.95),
+          elevation: 10,
+          indicatorColor: studentColor.withValues(alpha: 0.1),
           labelTextStyle: WidgetStateProperty.resolveWith((states) {
             final selected = states.contains(WidgetState.selected);
-            return GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? primaryMid : labelGrey,
+            return GoogleFonts.outfit(
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+              color: selected ? studentColor : textSecondary,
             );
           }),
           iconTheme: WidgetStateProperty.resolveWith((states) {
             final selected = states.contains(WidgetState.selected);
             return IconThemeData(
-              color: selected ? primaryMid : labelGrey,
-              size: 22,
+              color: selected ? studentColor : textSecondary,
+              size: 24,
+              shadows: selected ? [Shadow(color: studentColor, blurRadius: 10)] : null,
             );
           }),
         ),
-        drawerTheme: const DrawerThemeData(
-          backgroundColor: surfaceColor,
-          elevation: 0,
-          shadowColor: Colors.transparent,
-        ),
-        snackBarTheme: SnackBarThemeData(
-          backgroundColor: primaryDark,
-          contentTextStyle: GoogleFonts.inter(color: Colors.white, fontSize: 13),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        dialogTheme: DialogThemeData(
-          backgroundColor: surfaceColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          elevation: 0,
-        ),
-        bottomSheetTheme: const BottomSheetThemeData(
-          backgroundColor: surfaceColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          elevation: 0,
-        ),
       ),
-      initialRoute: SignInScreen.routeName,
+      initialRoute: SplashScreen.routeName,
       routes: {
+        SplashScreen.routeName: (_) => const SplashScreen(),
         SignInScreen.routeName: (_) => const SignInScreen(),
         SignOutScreen.routeName: (_) => const SignOutScreen(),
         AdminDashboardScreen.routeName: (_) => const AdminDashboardScreen(),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-import '../../data/roles.dart';
+import '../../theme/app_colors.dart';
 import '../../services/auth_service.dart';
 import 'sign_in_screen.dart';
 
@@ -14,60 +13,47 @@ class SignOutScreen extends StatefulWidget {
 }
 
 class _SignOutScreenState extends State<SignOutScreen> {
-  String _selectedRole = kUserRoles.first;
   final AuthService _authService = AuthService();
-  bool _isSubmitting = false;
+  bool _isLoading = false;
 
   Future<void> _handleSignOut() async {
-    if (_isSubmitting) {
-      return;
-    }
-    setState(() => _isSubmitting = true);
+    setState(() => _isLoading = true);
     try {
       await _authService.signOut();
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil(
         SignInScreen.routeName,
         (route) => false,
       );
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sign out failed: $error')),
-      );
-    } finally {
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sign out failed: $error'), backgroundColor: AppColors.error),
+        );
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _handleDeleteAccount() async {
-    if (_isSubmitting) {
-      return;
-    }
-
-    // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Account'),
+        backgroundColor: AppColors.surface,
+        title: const Text('Delete Account', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: const Text(
-          'This action is permanent. All your data including groups, documents, and invitations will be deleted from the system. Are you sure?',
+          'This action is permanent. All your data including groups, documents, and invitations will be deleted. Are you sure?',
+          style: TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
+            child: const Text('Delete', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -75,198 +61,145 @@ class _SignOutScreenState extends State<SignOutScreen> {
 
     if (!confirmed) return;
 
-    setState(() => _isSubmitting = true);
+    setState(() => _isLoading = true);
     try {
       await _authService.deleteAccount();
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account deleted successfully')),
-      );
+      if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil(
         SignInScreen.routeName,
         (route) => false,
       );
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delete failed: $error')),
-      );
-    } finally {
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed: $error'), backgroundColor: AppColors.error),
+        );
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    const accentColor = AppColors.adminPink;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign Out')),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFF7F5F2), Color(0xFFF0E6DB)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Ready to leave?',
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF14375E),
-                          ),
-                      textAlign: TextAlign.center,
+        title: const Text('Session Security', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+      ),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                children: [
+                  // Icon
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: accentColor.withValues(alpha: 0.2), blurRadius: 30)
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Confirm your role before signing out.',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: const Color(0xFF6B7A99),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    Card(
-                      elevation: 0,
+                    child: const Icon(Icons.power_settings_new_rounded, size: 64, color: accentColor),
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'Ready to leave?',
+                    style: TextStyle(
                       color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        side: const BorderSide(color: Color(0xFFE6E6E6)),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              'Current Role',
-                              style: Theme.of(context).textTheme.labelLarge
-                                  ?.copyWith(color: const Color(0xFF14375E)),
-                            ),
-                            const SizedBox(height: 8),
-                            DropdownButtonFormField<String>(
-                              value: _selectedRole,
-                              items: kUserRoles
-                                  .map(
-                                    (role) => DropdownMenuItem<String>(
-                                      value: role,
-                                      child: Text(role),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (value) {
-                                if (value == null) {
-                                  return;
-                                }
-                                setState(() => _selectedRole = value);
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF3F7FF),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.shield_outlined,
-                                    color: colorScheme.primary,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'Signing out will pause your workflow notifications.',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: const Color(0xFF4A5568),
-                                          ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            FilledButton(
-                              onPressed: _handleSignOut,
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                backgroundColor: const Color(0xFFB83280),
-                              ),
-                              child: _isSubmitting
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation(
-                                          Colors.white,
-                                        ),
-                                      ),
-                                    )
-                                  : const Text('Confirm Sign Out'),
-                            ),
-                            const SizedBox(height: 12),
-                            FilledButton.tonal(
-                              onPressed: _isSubmitting ? null : _handleDeleteAccount,
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                backgroundColor: Colors.red.shade100,
-                                foregroundColor: Colors.red.shade900,
-                              ),
-                              child: const Text('Delete Account'),
-                            ),
-                            const SizedBox(height: 12),
-                            OutlinedButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                              },
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Text('Back to Sign In'),
-                            ),
-                          ],
-                        ),
-                      ),
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Signing out will end your current session.',
+                    style: TextStyle(color: Colors.white60, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 48),
+
+                  Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(32),
+                      border: Border.all(color: accentColor.withValues(alpha: 0.3), width: 1.5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Manage Account',
+                          style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'You can choose to sign out temporarily or permanently delete your data.',
+                          style: TextStyle(color: Colors.white60, fontSize: 13),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // Sign Out Button
+                        Container(
+                          height: 56,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(color: accentColor.withValues(alpha: 0.4), blurRadius: 15)
+                            ],
+                          ),
+                          child: FilledButton(
+                            onPressed: _isLoading ? null : _handleSignOut,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: accentColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                            child: _isLoading 
+                              ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Text('Confirm Sign Out', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 20),
+                        
+                        // Delete Account Button
+                        OutlinedButton(
+                          onPressed: _isLoading ? null : _handleDeleteAccount,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                            side: const BorderSide(color: AppColors.error),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: const Text('Delete Account', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+
+                        const SizedBox(height: 24),
+                        
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Stay Signed In', style: TextStyle(color: Colors.white60, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import 'student_dashboard_screen.dart';
 import 'student_groups_screen.dart';
 import 'student_messages_screen.dart';
-import 'student_reports_screen.dart';
 import 'student_settings_screen.dart';
 
 class StudentNavBar extends StatelessWidget {
@@ -17,11 +17,11 @@ class StudentNavBar extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 20),
       height: 70,
       decoration: BoxDecoration(
-        color: const Color(0xFF000000),
+        color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(35),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -32,16 +32,16 @@ class StudentNavBar extends StatelessWidget {
         child: Theme(
           data: Theme.of(context).copyWith(
             navigationBarTheme: NavigationBarThemeData(
-              indicatorColor: Colors.white.withOpacity(0.1),
+              indicatorColor: AppColors.studentTeal.withValues(alpha: 0.15),
               iconTheme: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
-                  return const IconThemeData(color: Colors.white, size: 26);
+                  return IconThemeData(color: AppColors.studentTeal, size: 28);
                 }
                 return const IconThemeData(color: Colors.white60, size: 24);
               }),
               labelTextStyle: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
-                  return const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold);
+                  return TextStyle(color: AppColors.studentTeal, fontSize: 13, fontWeight: FontWeight.w900);
                 }
                 return const TextStyle(color: Colors.white60, fontSize: 11);
               }),

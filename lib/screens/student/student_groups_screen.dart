@@ -65,6 +65,14 @@ class _StudentGroupsScreenState extends State<StudentGroupsScreen> {
 
   Future<void> _createGroupAndInvite() async {
     final user = FirebaseAuth.instance.currentUser!;
+    
+    // Fetch user university
+    final userSnap = await _usersRef.child(user.uid).get();
+    String? userUniversity;
+    if (userSnap.exists && userSnap.value is Map) {
+      userUniversity = (userSnap.value as Map)['university'] as String?;
+    }
+
     final inviteEmails = _memberControllers
         .map((c) => c.text.trim())
         .where((e) => e.isNotEmpty)
@@ -86,6 +94,7 @@ class _StudentGroupsScreenState extends State<StudentGroupsScreen> {
         'requiredSize': _requiredSize,
         'supervisorEmail': '',
         'leaderUid': user.uid,
+        'university': userUniversity,
         'createdAt': DateTime.now().millisecondsSinceEpoch,
         // The creator is automatically added as an accepted member
         'members/${user.uid}': {

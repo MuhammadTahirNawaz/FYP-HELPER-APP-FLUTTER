@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import 'committee_dashboard_screen.dart';
 import 'committee_proposal_review_screen.dart';
@@ -31,16 +32,16 @@ class CommitteeNavBar extends StatelessWidget {
         child: Theme(
           data: Theme.of(context).copyWith(
             navigationBarTheme: NavigationBarThemeData(
-              indicatorColor: Colors.white.withOpacity(0.1),
+              indicatorColor: AppColors.adminPink.withValues(alpha: 0.15),
               iconTheme: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
-                  return const IconThemeData(color: Colors.white, size: 26);
+                  return IconThemeData(color: AppColors.adminPink, size: 28);
                 }
                 return const IconThemeData(color: Colors.white60, size: 24);
               }),
               labelTextStyle: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
-                  return const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold);
+                  return TextStyle(color: AppColors.adminPink, fontSize: 13, fontWeight: FontWeight.w900);
                 }
                 return const TextStyle(color: Colors.white60, fontSize: 11);
               }),

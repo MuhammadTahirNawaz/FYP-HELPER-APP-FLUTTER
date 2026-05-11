@@ -1,15 +1,15 @@
 import 'package:file_selector/file_selector.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../services/system_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../../services/cloudinary_service.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../theme/app_colors.dart';
 
 import '../shared/messages_screen.dart';
 import 'admin_nav_bar.dart';
 import 'admin_settings_screen.dart';
+import '../auth/sign_out_screen.dart';
 
 /// Opens a document URL directly in a new browser tab / OS handler.
 void _openDocumentUrl(String url) {
@@ -26,12 +26,29 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  final DatabaseReference _usersRef =
-      FirebaseDatabase.instance.ref('users');
-  final DatabaseReference _adminRef =
-      FirebaseDatabase.instance.ref('admin');
+  final DatabaseReference _usersRef = FirebaseDatabase.instance.ref('users');
+  String? _adminUniversity;
+  
+  DatabaseReference get _adminRef => FirebaseDatabase.instance.ref('admin/universities/${_adminUniversity ?? "default"}');
   _AdminSection _currentSection = _AdminSection.dashboard;
   int _bottomIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAdminUniversity();
+  }
+
+  Future<void> _fetchAdminUniversity() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final snap = await FirebaseDatabase.instance.ref('users/${user.uid}').get();
+      if (snap.exists && snap.value is Map) {
+        final data = Map<String, dynamic>.from(snap.value as Map);
+        if (mounted) setState(() => _adminUniversity = data['university'] as String?);
+      }
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -50,43 +67,64 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         elevation: 0,
         centerTitle: false,
-        backgroundColor: const Color(0xFF14375E),
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               _currentSection.title,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -0.5, color: Colors.white),
             ),
-            Text(
-              'Admin control center',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white70,
-                  ),
+            Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.adminPink),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Admin control center',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppColors.adminPink,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
             ),
           ],
         ),
         actions: [
+          StreamBuilder<DatabaseEvent>(
+            stream: _usersRef.onValue,
+            builder: (context, snapshot) {
+              int pendingCount = 0;
+              if (snapshot.hasData && snapshot.data?.snapshot.value is Map) {
+                final users = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
+                pendingCount = users.values.where((u) => u is Map && u['role'] == 'Pending' && u['university'] == _adminUniversity).length;
+              }
+              return Badge(
+                label: Text(pendingCount.toString()),
+                isLabelVisible: pendingCount > 0,
+                backgroundColor: AppColors.adminPink,
+                child: IconButton(
+                  icon: const Icon(Icons.notifications_outlined, color: AppColors.adminPink),
+                  onPressed: () => setState(() => _currentSection = _AdminSection.userManagement),
+                ),
+              );
+            },
+          ),
           IconButton(
-            icon: const Icon(Icons.account_circle, color: Colors.white),
+            icon: const Icon(Icons.account_circle_outlined),
             onPressed: () => Navigator.of(context).pushNamed(AdminSettingsScreen.routeName),
           ),
           const SizedBox(width: 8),
         ],
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF000000), Color(0xFF1E293B)],
-            ),
-          ),
-        ),
       ),
       drawer: _AdminDrawer(
         selected: _currentSection,
@@ -99,11 +137,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             setState(() => _currentSection = _AdminSection.dashboard);
           }
         },
-        child: _AdminSectionBody(
-          section: _currentSection,
-          usersRef: _usersRef,
-          adminRef: _adminRef,
-        ),
+        child: _adminUniversity == null
+          ? const Center(child: CircularProgressIndicator())
+          : _AdminSectionBody(
+              section: _currentSection,
+              usersRef: _usersRef,
+              adminRef: _adminRef,
+              university: _adminUniversity,
+            ),
       ),
       bottomNavigationBar: AdminNavBar(
         selectedIndex: switch (_currentSection) {
@@ -125,11 +166,13 @@ class _AdminSectionBody extends StatelessWidget {
     required this.section,
     required this.usersRef,
     required this.adminRef,
+    this.university,
   });
 
   final _AdminSection section;
   final DatabaseReference usersRef;
   final DatabaseReference adminRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -138,6 +181,7 @@ class _AdminSectionBody extends StatelessWidget {
         return _AdminDashboardHome(
           usersRef: usersRef,
           adminRef: adminRef,
+          university: university,
         );
       case _AdminSection.announcements:
         return _CrudSection(
@@ -145,24 +189,30 @@ class _AdminSectionBody extends StatelessWidget {
           emptyText: 'No announcements yet.',
           dataRef: adminRef.child('announcements'),
           includeDate: false,
+          university: university,
         );
       case _AdminSection.messages:
         return const MessagesScreen(isAdmin: true);
       case _AdminSection.userManagement:
-        return _UserManagementSection(usersRef: usersRef);
+        return _UserManagementSection(usersRef: usersRef, university: university);
       case _AdminSection.groupsApproval:
         return _GroupsApprovalSection(
           groupsRef: FirebaseDatabase.instance.ref('groups'),
           usersRef: usersRef,
+          university: university,
         );
       case _AdminSection.supervisorLimits:
         return _SupervisorLimitsSection(
           usersRef: usersRef,
           groupsRef: FirebaseDatabase.instance.ref('groups'),
           adminRef: adminRef,
+          university: university,
         );
       case _AdminSection.documents:
-        return _DocumentsSection(documentsRef: adminRef.child('documents'));
+        return _DocumentsSection(
+          documentsRef: adminRef.child('documents'),
+          university: university,
+        );
     }
   }
 }
@@ -190,71 +240,99 @@ class _AdminDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
+      backgroundColor: AppColors.bg,
       child: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.zero,
+        child: Column(
           children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFF000000), Color(0xFF1E293B)],
+                  colors: [AppColors.adminPink.withValues(alpha: 0.2), Colors.transparent],
                 ),
               ),
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const CircleAvatar(
-                      radius: 22,
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.admin_panel_settings, color: Color(0xFF14375E)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.adminPink.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.adminPink.withValues(alpha: 0.3)),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Admin Panel',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
+                    child: const Icon(Icons.admin_panel_settings, color: AppColors.adminPink, size: 30),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Admin Panel',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                  Text(
+                    'Management Terminal',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.adminPink,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: AppColors.border, height: 1),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                children: [
+                  for (final section in _drawerSections)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        tileColor: section == selected ? AppColors.adminPink.withValues(alpha: 0.1) : Colors.transparent,
+                        leading: Icon(
+                          section.icon,
+                          color: section == selected ? AppColors.adminPink : AppColors.textSecondary,
+                        ),
+                        title: Text(
+                          section.title,
+                          style: TextStyle(
+                            color: section == selected ? Colors.white : AppColors.textSecondary,
+                            fontWeight: section == selected ? FontWeight.w900 : FontWeight.w600,
                           ),
+                        ),
+                        onTap: () => onSelected(section),
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Users, sessions, approvals, analytics',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white70,
-                          ),
-                    ),
-                  ],
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pushNamed(SignOutScreen.routeName),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(backgroundColor: AppColors.adminPink, radius: 18, child: Icon(Icons.logout, color: Colors.black, size: 18)),
+                      const SizedBox(width: 12),
+                      Text('Logout Session', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                    ],
+                  ),
                 ),
               ),
             ),
-            for (final section in _drawerSections)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                child: ListTile(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  tileColor: section == selected ? const Color(0xFFEDF1F9) : Colors.transparent,
-                  leading: Icon(
-                    section.icon,
-                    color: section == selected ? const Color(0xFF1E6091) : const Color(0xFF6B7A99),
-                  ),
-                  title: Text(
-                    section.title,
-                    style: TextStyle(
-                      color: section == selected ? const Color(0xFF14375E) : const Color(0xFF6B7A99),
-                      fontWeight: section == selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                  ),
-                  selected: section == selected,
-                  onTap: () => onSelected(section),
-                ),
-              ),
           ],
         ),
       ),
@@ -266,10 +344,12 @@ class _AdminDashboardHome extends StatelessWidget {
   const _AdminDashboardHome({
     required this.usersRef,
     required this.adminRef,
+    this.university,
   });
 
   final DatabaseReference usersRef;
   final DatabaseReference adminRef;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -279,9 +359,16 @@ class _AdminDashboardHome extends StatelessWidget {
       stream: usersRef.onValue,
       builder: (context, usersSnapshot) {
         final usersData = usersSnapshot.data?.snapshot.value;
-        final usersMap = usersData is Map
+        final allUsers = usersData is Map
             ? Map<String, dynamic>.from(usersData)
             : <String, dynamic>{};
+            
+        // Filter by University - Strict match
+        final usersMap = Map.fromEntries(allUsers.entries.where((e) {
+          final userData = e.value as Map;
+          return university != null && userData['university'] == university;
+        }));
+
         final totalUsers = usersMap.length;
         final pendingUsers = usersMap.values
             .where((value) =>
@@ -320,7 +407,7 @@ class _AdminDashboardHome extends StatelessWidget {
                           label: 'Total Users',
                           value: totalUsers.toString(),
                           icon: Icons.group,
-                          accent: const Color(0xFF1E6091),
+                          accent: AppColors.primaryBlue,
                         ),
                         _StatItem(
                           label: 'Pending',
@@ -373,54 +460,55 @@ class _StatsGrid extends StatelessWidget {
     return GridView.count(
       shrinkWrap: true,
       crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
       physics: const NeverScrollableScrollPhysics(),
       children: stats
           .map(
-            (stat) => Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: stat.accent.withOpacity(0.12)),
+            (stat) => Container(
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: AppColors.border, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: stat.accent.withValues(alpha: 0.1),
+                    blurRadius: 20,
+                    spreadRadius: -10,
+                  ),
+                ],
               ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [stat.accent.withOpacity(0.16), Colors.white],
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: stat.accent.withOpacity(0.14),
-                        child: Icon(stat.icon, color: stat.accent),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: stat.accent.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      const Spacer(),
-                      Text(
-                        stat.value,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF14375E),
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        stat.label,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: const Color(0xFF6B7A99),
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    ],
-                  ),
+                      child: Icon(stat.icon, color: stat.accent, size: 20),
+                    ),
+                    const Spacer(),
+                    Text(
+                      stat.value,
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            fontSize: 28,
+                          ),
+                    ),
+                    Text(
+                      stat.label.toUpperCase(),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1,
+                          ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -456,7 +544,7 @@ class _ActionChip extends StatelessWidget {
       backgroundColor: const Color(0xFFEFF6FF),
       side: const BorderSide(color: Color(0xFFBFDBFE)),
       labelStyle: const TextStyle(
-        color: Color(0xFF1E6091),
+        color: AppColors.primaryBlue,
         fontWeight: FontWeight.w600,
       ),
     );
@@ -477,41 +565,50 @@ class _DashboardBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF14375E), Color(0xFF1E6091)],
-        ),
+        color: AppColors.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: AppColors.adminPink.withValues(alpha: 0.3), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.adminPink.withValues(alpha: 0.1),
+            blurRadius: 30,
+            spreadRadius: -5,
+          ),
+        ],
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: Colors.white.withOpacity(0.16),
-            child: Icon(icon, color: Colors.white),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.adminPink.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.adminPink.withValues(alpha: 0.4)),
+              boxShadow: [
+                BoxShadow(color: AppColors.adminPink.withValues(alpha: 0.3), blurRadius: 15),
+              ],
+            ),
+            child: Icon(icon, color: AppColors.adminPink, size: 32),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 24),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white70,
-                        height: 1.4,
-                      ),
+                  style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                 ),
               ],
             ),
@@ -523,9 +620,10 @@ class _DashboardBanner extends StatelessWidget {
 }
 
 class _UserManagementSection extends StatefulWidget {
-  const _UserManagementSection({required this.usersRef});
+  const _UserManagementSection({required this.usersRef, this.university});
 
   final DatabaseReference usersRef;
+  final String? university;
 
   @override
   State<_UserManagementSection> createState() =>
@@ -588,6 +686,7 @@ class _UserManagementSectionState extends State<_UserManagementSection> {
                 Map<String, dynamic>.from(entry.value as Map),
               ),
             )
+            .where((user) => widget.university != null && user.university == widget.university)
             .toList();
 
         final pending = users.where((user) => user.role == 'Pending').toList();
@@ -663,7 +762,7 @@ class _PendingUserCard extends StatelessWidget {
       ),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFFEDF1F9),
+          backgroundColor: AppColors.selectedTile,
           child: Text(user.email.isEmpty ? '?' : user.email[0]),
         ),
         title: Text(user.email.isEmpty ? 'Unknown email' : user.email),
@@ -713,10 +812,12 @@ class _GroupsApprovalSection extends StatefulWidget {
   const _GroupsApprovalSection({
     required this.groupsRef,
     required this.usersRef,
+    this.university,
   });
 
   final DatabaseReference groupsRef;
   final DatabaseReference usersRef;
+  final String? university;
 
   @override
   State<_GroupsApprovalSection> createState() => _GroupsApprovalSectionState();
@@ -766,6 +867,7 @@ class _GroupsApprovalSectionState extends State<_GroupsApprovalSection> {
         final groupsData = snapshot.data?.snapshot.value;
         final groups = _GroupRow.fromSnapshot(groupsData)
             .where((group) => group.status == 'Pending')
+            .where((group) => widget.university == null || group.university == widget.university)
             .toList();
 
         return StreamBuilder<DatabaseEvent>(
@@ -809,7 +911,7 @@ class _GroupsApprovalSectionState extends State<_GroupsApprovalSection> {
                               : '');
                       final selectedSupervisor = supervisors
                           .firstWhere((sup) => sup.email == selected,
-                              orElse: () => supervisors.isNotEmpty ? supervisors.first : null as _UserRow);
+                              orElse: () => supervisors.isNotEmpty ? supervisors.first : _UserRow(uid: '', email: '', role: ''));
                       return Card(
                         elevation: 0,
                         margin: const EdgeInsets.only(bottom: 12),
@@ -888,11 +990,13 @@ class _SupervisorLimitsSection extends StatefulWidget {
     required this.usersRef,
     required this.groupsRef,
     required this.adminRef,
+    this.university,
   });
 
   final DatabaseReference usersRef;
   final DatabaseReference groupsRef;
   final DatabaseReference adminRef;
+  final String? university;
 
   @override
   State<_SupervisorLimitsSection> createState() =>
@@ -994,6 +1098,7 @@ class _SupervisorLimitsSectionState extends State<_SupervisorLimitsSection> {
         final usersData = userSnapshot.data?.snapshot.value;
         final supervisors = _UserRow.fromSnapshot(usersData)
             .where((user) => user.role == 'Supervisor')
+            .where((user) => widget.university == null || user.university == widget.university)
             .toList();
 
         return StreamBuilder<DatabaseEvent>(
@@ -1008,7 +1113,9 @@ class _SupervisorLimitsSectionState extends State<_SupervisorLimitsSection> {
               stream: widget.groupsRef.onValue,
               builder: (context, groupsSnapshot) {
                 final groupsData = groupsSnapshot.data?.snapshot.value;
-                final groups = _GroupRow.fromSnapshot(groupsData);
+                final groups = _GroupRow.fromSnapshot(groupsData)
+                    .where((group) => widget.university == null || group.university == widget.university)
+                    .toList();
 
                 final supervisorCapacity = <String, int>{};
                 for (var group in groups) {
@@ -1163,7 +1270,7 @@ class _UserCard extends StatelessWidget {
       ),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFFEDF1F9),
+          backgroundColor: AppColors.selectedTile,
           child: Text(user.email.isEmpty ? '?' : user.email[0]),
         ),
         title: Text(user.email.isEmpty ? 'Unknown email' : user.email),
@@ -1214,9 +1321,10 @@ int _toIntTs(Object? value) {
 }
 
 class _DocumentsSection extends StatefulWidget {
-  const _DocumentsSection({required this.documentsRef});
+  const _DocumentsSection({required this.documentsRef, this.university});
 
   final DatabaseReference documentsRef;
+  final String? university;
 
   @override
   State<_DocumentsSection> createState() => _DocumentsSectionState();
@@ -1255,11 +1363,13 @@ class _DocumentsSectionState extends State<_DocumentsSection> {
                   children: [
                     TextField(
                       controller: titleController,
+                      style: const TextStyle(fontWeight: FontWeight.normal),
                       decoration: const InputDecoration(labelText: 'Title'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: descriptionController,
+                      style: const TextStyle(fontWeight: FontWeight.normal),
                       decoration: const InputDecoration(labelText: 'Description'),
                       maxLines: 3,
                     ),
@@ -1383,12 +1493,14 @@ class _DocumentsSectionState extends State<_DocumentsSection> {
                                 'uploadedBy': uploaderEmail,
                                 'createdAt': ServerValue.timestamp,
                                 'updatedAt': ServerValue.timestamp,
+                                'university': widget.university,
                               };
+                              final uniPath = widget.university ?? 'default';
                               final updates = <String, Object?>{
-                                'admin/documents/$docId': payload,
+                                'admin/universities/$uniPath/documents/$docId': payload,
                               };
                               for (final role in selectedRoles) {
-                                updates['documents_by_role/$role/$docId'] =
+                                updates['admin/universities/$uniPath/documents_by_role/$role/$docId'] =
                                     payload;
                               }
                               await rootRef.update(updates);
@@ -1412,22 +1524,24 @@ class _DocumentsSectionState extends State<_DocumentsSection> {
                                 'createdAt': existing.createdAt ??
                                     ServerValue.timestamp,
                                 'updatedAt': ServerValue.timestamp,
+                                'university': widget.university,
                               };
                               // Note: Cloudinary unsigned API does not support updating metadata from client.
                               // Roles are primarily managed via the Realtime Database nodes anyway.
+                              final uniPath = widget.university ?? 'default';
                               final updates = <String, Object?>{
-                                'admin/documents/${existing.id}': payload,
+                                'admin/universities/$uniPath/documents/${existing.id}': payload,
                               };
                               final existingRoles = existing.roles.toSet();
                               for (final role in existingRoles) {
                                 if (!selectedRoles.contains(role)) {
                                   updates[
-                                      'documents_by_role/$role/${existing.id}'] =
+                                      'admin/universities/$uniPath/documents_by_role/$role/${existing.id}'] =
                                       null;
                                 }
                               }
                               for (final role in selectedRoles) {
-                                updates['documents_by_role/$role/${existing.id}'] =
+                                updates['admin/universities/$uniPath/documents_by_role/$role/${existing.id}'] =
                                     payload;
                               }
                               await rootRef.update(updates);
@@ -1468,11 +1582,12 @@ class _DocumentsSectionState extends State<_DocumentsSection> {
     // Note: Cloudinary unsigned API does not support deletions from client app.
     // The files will become orphaned in Cloudinary. To delete them physically, a backend is required.
     final rootRef = FirebaseDatabase.instance.ref();
+    final uniPath = widget.university ?? 'default';
     final updates = <String, Object?>{
-      'admin/documents/${doc.id}': null,
+      'admin/universities/$uniPath/documents/${doc.id}': null,
     };
     for (final role in doc.roles) {
-      updates['documents_by_role/$role/${doc.id}'] = null;
+      updates['admin/universities/$uniPath/documents_by_role/$role/${doc.id}'] = null;
     }
     await rootRef.update(updates);
   }
@@ -1575,12 +1690,14 @@ class _CrudSection extends StatelessWidget {
     required this.emptyText,
     required this.dataRef,
     required this.includeDate,
+    this.university,
   });
 
   final String title;
   final String emptyText;
   final DatabaseReference dataRef;
   final bool includeDate;
+  final String? university;
 
   @override
   Widget build(BuildContext context) {
@@ -1591,7 +1708,12 @@ class _CrudSection extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         final data = snapshot.data?.snapshot.value;
-        final items = _CrudItem.fromSnapshot(data);
+        final allItems = _CrudItem.fromSnapshot(data);
+        
+        // Filter by University
+        final items = university == null 
+          ? allItems 
+          : allItems.where((item) => item.university == university).toList();
 
         return ListView(
           padding: const EdgeInsets.all(16),
@@ -1644,11 +1766,13 @@ class _CrudSection extends StatelessWidget {
               children: [
                 TextField(
                   controller: titleController,
+                  style: const TextStyle(fontWeight: FontWeight.normal),
                   decoration: const InputDecoration(labelText: 'Title'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: detailsController,
+                  style: const TextStyle(fontWeight: FontWeight.normal),
                   decoration: const InputDecoration(labelText: 'Details'),
                   maxLines: 3,
                 ),
@@ -1656,6 +1780,7 @@ class _CrudSection extends StatelessWidget {
                   const SizedBox(height: 12),
                   TextField(
                     controller: dateController,
+                    style: const TextStyle(fontWeight: FontWeight.normal),
                     decoration: const InputDecoration(
                       labelText: 'Date (YYYY-MM-DD)',
                     ),
@@ -1680,6 +1805,7 @@ class _CrudSection extends StatelessWidget {
                 final payload = <String, dynamic>{
                   'title': titleText,
                   'details': detailsText,
+                  'university': university, // Add university scoping to new items
                   if (includeDate && dateText.isNotEmpty) 'date': dateText,
                   'updatedAt': ServerValue.timestamp,
                   if (existing == null) 'createdAt': ServerValue.timestamp,
@@ -1761,12 +1887,14 @@ class _UserRow {
     required this.uid,
     required this.email,
     required this.role,
+    this.university,
     this.requestedRole,
   });
 
   final String uid;
   final String email;
   final String role;
+  final String? university;
   final String? requestedRole;
 
   factory _UserRow.fromMap(String uid, Map<String, dynamic> data) {
@@ -1774,6 +1902,7 @@ class _UserRow {
       uid: uid,
       email: (data['email'] as String?) ?? '',
       role: (data['role'] as String?) ?? '',
+      university: data['university'] as String?,
       requestedRole: data['requestedRole'] as String?,
     );
   }
@@ -1799,12 +1928,14 @@ class _GroupRow {
     required this.code,
     required this.status,
     required this.supervisorEmail,
+    required this.university,
     required this.memberCount,
   });
 
   final String code;
   final String status;
   final String supervisorEmail;
+  final String? university;
   final int memberCount;
 
   static List<_GroupRow> fromSnapshot(Object? data) {
@@ -1819,6 +1950,7 @@ class _GroupRow {
         code: entry.key,
         status: (value['status'] as String?) ?? 'Pending',
         supervisorEmail: (value['supervisorEmail'] as String?) ?? '',
+        university: value['university'] as String?,
         memberCount: members?.length ?? 0,
       );
     }).toList();
@@ -1893,12 +2025,14 @@ class _CrudItem {
     required this.title,
     required this.details,
     required this.date,
+    this.university,
   });
 
   final String id;
   final String title;
   final String details;
   final String date;
+  final String? university;
 
   static List<_CrudItem> fromSnapshot(Object? data) {
     if (data is! Map) {
@@ -1912,6 +2046,7 @@ class _CrudItem {
         title: (value['title'] as String?) ?? '',
         details: (value['details'] as String?) ?? '',
         date: (value['date'] as String?) ?? '',
+        university: (value['university'] as String?),
       );
     }).toList();
   }
@@ -1958,7 +2093,7 @@ class _TimedAdBannerState extends State<_TimedAdBanner> {
 
     return Card(
       elevation: 4,
-      shadowColor: const Color(0xFF1E6091).withOpacity(0.3),
+      shadowColor: AppColors.primaryBlue.withValues(alpha: 0.3),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -1970,7 +2105,7 @@ class _TimedAdBannerState extends State<_TimedAdBanner> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF14375E), Color(0xFF1E6091), Color(0xFF14375E)],
+                colors: [AppColors.black, AppColors.primaryBlue, AppColors.black],
               ),
             ),
           ),
@@ -1990,7 +2125,7 @@ class _TimedAdBannerState extends State<_TimedAdBanner> {
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF14375E),
+                      color: AppColors.black,
                     ),
                   ),
                 ),
@@ -2046,7 +2181,7 @@ class _SystemHealthSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         side: const BorderSide(color: Color(0xFF334155)),
       ),
-      color: const Color(0xFF1E293B),
+      color: AppColors.surfaceStrong,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -2054,7 +2189,7 @@ class _SystemHealthSection extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.hub, color: Color(0xFF3B82F6)),
+                const Icon(Icons.hub, color: AppColors.infoBlue),
                 const SizedBox(width: 12),
                 Text(
                   'System Health & Services',
@@ -2129,7 +2264,7 @@ class _HealthRow extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -2154,14 +2289,14 @@ class _PermissionChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: AppColors.surfaceLight.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: const Color(0xFF3B82F6)),
+          Icon(icon, size: 14, color: AppColors.infoBlue),
           const SizedBox(width: 6),
           Text(
             label,
@@ -2172,4 +2307,22 @@ class _PermissionChip extends StatelessWidget {
     );
   }
 }
+
+class _NotificationItem extends StatelessWidget {
+  const _NotificationItem({required this.title, required this.time, required this.icon});
+  final String title;
+  final String time;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, color: AppColors.adminPink, size: 20),
+      title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+      subtitle: Text(time, style: const TextStyle(color: Colors.white60, fontSize: 11)),
+    );
+  }
+}
+
 

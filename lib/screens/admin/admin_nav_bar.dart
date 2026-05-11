@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import 'admin_dashboard_screen.dart';
 import 'admin_management_screen.dart';
-import 'admin_reports_screen.dart';
 import 'admin_settings_screen.dart';
 
 class AdminNavBar extends StatelessWidget {
@@ -16,11 +16,11 @@ class AdminNavBar extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 20),
       height: 70,
       decoration: BoxDecoration(
-        color: const Color(0xFF000000),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(35),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -31,16 +31,16 @@ class AdminNavBar extends StatelessWidget {
         child: Theme(
           data: Theme.of(context).copyWith(
             navigationBarTheme: NavigationBarThemeData(
-              indicatorColor: Colors.white.withOpacity(0.1),
+              indicatorColor: AppColors.adminPink.withValues(alpha: 0.15),
               iconTheme: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
-                  return const IconThemeData(color: Colors.white, size: 26);
+                  return IconThemeData(color: AppColors.adminPink, size: 28);
                 }
                 return const IconThemeData(color: Colors.white60, size: 24);
               }),
               labelTextStyle: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
-                  return const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold);
+                  return TextStyle(color: AppColors.adminPink, fontSize: 13, fontWeight: FontWeight.w900);
                 }
                 return const TextStyle(color: Colors.white60, fontSize: 11);
               }),
@@ -52,10 +52,10 @@ class AdminNavBar extends StatelessWidget {
             indicatorColor: Colors.transparent,
             selectedIndex: selectedIndex,
             destinations: const [
-              NavigationDestination(icon: Icon(Icons.home_outlined, color: Colors.white), label: 'Home'),
-              NavigationDestination(icon: Icon(Icons.dashboard_customize_outlined, color: Colors.white), label: 'Manage'),
-              NavigationDestination(icon: Icon(Icons.message_outlined, color: Colors.white), label: 'Chat'),
-              NavigationDestination(icon: Icon(Icons.settings_outlined, color: Colors.white), label: 'System'),
+              NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
+              NavigationDestination(icon: Icon(Icons.dashboard_customize_outlined), label: 'Manage'),
+              NavigationDestination(icon: Icon(Icons.message_outlined), label: 'Chat'),
+              NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'System'),
             ],
             onDestinationSelected: (index) {
               if (index == selectedIndex) return;
