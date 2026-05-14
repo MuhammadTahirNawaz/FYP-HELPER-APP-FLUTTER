@@ -86,13 +86,3 @@ If platform files are missing or outdated:
 flutter create .
 ```
 
-## Notes for Safe Git Push
-
-The root `.gitignore` excludes generated files, build outputs, and common secret files (keystores, key properties, and environment files).
-
-Before pushing, verify you are not committing secrets:
-
-```bash
-git status
-git diff --staged
-```
