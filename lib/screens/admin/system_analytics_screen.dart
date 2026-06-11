@@ -1,5 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import 'admin_nav_bar.dart';
 
@@ -14,6 +15,7 @@ class SystemAnalyticsScreen extends StatelessWidget {
     final groupsRef = FirebaseDatabase.instance.ref('groups');
 
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text('System Analytics'),
         leading: IconButton(
@@ -63,7 +65,11 @@ class SystemAnalyticsScreen extends StatelessWidget {
               if (e is! Map) continue;
               final g = Map<String, dynamic>.from(e);
               final sid = (g['supervisorId'] as String?) ?? '';
-              if (sid.isNotEmpty) assigned++; else unassigned++;
+              if (sid.isNotEmpty) {
+                assigned++;
+              } else {
+                unassigned++;
+              }
             }
           }
 
@@ -183,7 +189,7 @@ class _MetricCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor: color.withOpacity(0.12),
+              backgroundColor: color.withValues(alpha: 0.12),
               child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(height: 12),
@@ -234,7 +240,7 @@ class _BreakdownBar extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: pct,
                 minHeight: 8,
-                backgroundColor: const Color(0xFFEDF1F9),
+                backgroundColor: AppColors.surfaceMuted,
                 valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
             ),
@@ -258,14 +264,14 @@ class _TagChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFEDF1F9),
+        color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(label,
           style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF14375E))),
+              color: AppColors.navy)),
     );
   }
 }

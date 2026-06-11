@@ -1,5 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 class AdminDeactivateAccountsScreen extends StatelessWidget {
   const AdminDeactivateAccountsScreen({super.key});
@@ -56,11 +57,11 @@ class AdminDeactivateAccountsScreen extends StatelessWidget {
               return Card(
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: const Color(0xFFEDF1F9),
+                    backgroundColor: AppColors.surfaceMuted,
                     child: Text(
                       name.isNotEmpty ? name[0].toUpperCase() : '?',
                       style: const TextStyle(
-                          color: Color(0xFF14375E), fontWeight: FontWeight.w700),
+                          color: AppColors.navy, fontWeight: FontWeight.w700),
                     ),
                   ),
                   title: Text(name,

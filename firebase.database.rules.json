@@ -1,9 +1,131 @@
 {
   "rules": {
-    ".read": "auth != null",
-    ".write": "auth != null",
+    ".read": false,
+    ".write": false,
+
+    "healthcheck": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
     "users": {
-      ".indexOn": ["email"]
+      ".read": "auth != null",
+      ".indexOn": ["email", "role", "university"],
+      "$uid": {
+        ".write": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('role').val() == 'Admin')",
+        "role": {
+          ".validate": "newData.isString()",
+          ".write": "auth != null && ((auth.uid == $uid && !data.exists() && (newData.val() == 'Pending' || newData.val() == 'Admin')) || root.child('users').child(auth.uid).child('role').val() == 'Admin')"
+        },
+        "invitations": {
+          "$groupCode": {
+            ".read": "auth != null && auth.uid == $uid",
+            ".write": "auth != null && (auth.uid == $uid || !data.exists())"
+          }
+        },
+        "notifications": {
+          ".read": "auth != null && auth.uid == $uid",
+          "$notifId": {
+            ".write": "auth != null && (!data.exists() || auth.uid == $uid)"
+          }
+        },
+        "group_notifications": {
+          ".read": "auth != null && auth.uid == $uid",
+          ".write": "auth != null && auth.uid == $uid"
+        },
+        "fcmToken": {
+          ".read": "auth != null && auth.uid == $uid",
+          ".write": "auth != null && auth.uid == $uid"
+        },
+        "fcmUpdatedAt": {
+          ".write": "auth != null && auth.uid == $uid"
+        },
+        "fcmPlatform": {
+          ".write": "auth != null && auth.uid == $uid"
+        }
+      }
+    },
+
+    "groups": {
+      ".read": "auth != null",
+      ".indexOn": ["leaderUid", "supervisorId", "status", "university"],
+      "$groupId": {
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'Admin' || root.child('users').child(auth.uid).child('role').val() == 'Committee' || (!data.exists() && newData.child('leaderUid').val() == auth.uid) || data.child('leaderUid').val() == auth.uid || data.child('members').child(auth.uid).exists() || data.child('supervisorId').val() == auth.uid || newData.child('supervisorId').val() == auth.uid)"
+      }
+    },
+
+    "supervisor": {
+      "$supervisorUid": {
+        ".read": "auth != null && (auth.uid == $supervisorUid || root.child('users').child(auth.uid).child('role').val() == 'Admin' || root.child('users').child(auth.uid).child('role').val() == 'Student')",
+        ".write": "auth != null && (auth.uid == $supervisorUid || root.child('users').child(auth.uid).child('role').val() == 'Admin' || root.child('users').child(auth.uid).child('role').val() == 'Student')"
+      }
+    },
+
+    "student": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('role').val() == 'Admin' || root.child('users').child(auth.uid).child('role').val() == 'Supervisor' || root.child('users').child(auth.uid).child('role').val() == 'Committee')",
+        ".write": "auth != null && (auth.uid == $uid || root.child('users').child(auth.uid).child('role').val() == 'Admin')"
+      }
+    },
+
+    "admin": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'Admin'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'Admin'",
+      "universities": {
+        "$university": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'Admin'"
+        }
+      },
+      "documents": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'Admin'"
+      },
+      "reports": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'Admin' || root.child('users').child(auth.uid).child('role').val() == 'Student')",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'Admin'"
+      },
+      "reviewPanels": {
+        ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'Admin'",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'Admin'"
+      }
+    },
+
+    "documents_by_role": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() == 'Admin'"
+    },
+
+    "messages": {
+      "threads": {
+        ".read": "auth != null",
+        ".indexOn": ["conversationKey"],
+        "$threadId": {
+          ".write": "auth != null && (!data.exists() || data.child('participantUid1').val() == auth.uid || data.child('participantUid2').val() == auth.uid || root.child('users').child(auth.uid).child('role').val() == 'Admin')"
+        }
+      },
+      "items": {
+        "$threadId": {
+          ".read": "auth != null",
+          "$messageId": {
+            ".write": "auth != null && newData.child('senderUid').val() == auth.uid"
+          }
+        }
+      }
+    },
+
+    "groupInvites": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+
+    "committee": {
+      "notifications": {
+        ".read": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'Committee' || root.child('users').child(auth.uid).child('role').val() == 'Admin')",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() == 'Committee' || root.child('users').child(auth.uid).child('role').val() == 'Admin')"
+      }
     }
   }
 }

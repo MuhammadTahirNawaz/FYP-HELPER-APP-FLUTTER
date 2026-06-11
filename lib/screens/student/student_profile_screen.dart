@@ -1,7 +1,10 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../../services/user_profile_service.dart';
+import '../../core/validators.dart';
+import '../../repositories/auth_repository.dart';
+import '../../repositories/user_repository.dart';
+import '../../state/session_provider.dart';
 
 class StudentProfileScreen extends StatefulWidget {
   const StudentProfileScreen({super.key});
@@ -13,7 +16,7 @@ class StudentProfileScreen extends StatefulWidget {
 }
 
 class _StudentProfileScreenState extends State<StudentProfileScreen> {
-  final UserProfileService _profileService = UserProfileService();
+  final _formKey = GlobalKey<FormState>();
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _studentIdController = TextEditingController();
@@ -39,7 +42,9 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final authRepository = context.read<AuthRepository>();
+    final userRepository = context.read<UserRepository>();
+    final user = authRepository.currentUser;
     if (user == null) {
       setState(() {
         _errorMessage = 'Please sign in to load your profile.';
@@ -49,7 +54,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     }
 
     try {
-      final profile = await _profileService.fetchProfile(user.uid);
+      final profile = await userRepository.fetchProfile(user.uid);
       _fullNameController.text = profile?.fullName ?? '';
       _emailController.text = profile?.email.isNotEmpty == true
           ? profile!.email
@@ -66,11 +71,17 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
     if (_isSaving) {
       return;
     }
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+    final authRepository = context.read<AuthRepository>();
+    final userRepository = context.read<UserRepository>();
+    final session = context.read<SessionProvider>();
+    final uid = authRepository.currentUid;
+    if (uid == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please sign in first.')),
       );
@@ -79,12 +90,13 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
 
     setState(() => _isSaving = true);
     try {
-      await _profileService.updateProfile(
-        uid: user.uid,
+      await userRepository.updateProfile(
+        uid: uid,
         fullName: _fullNameController.text.trim(),
         studentId: _studentIdController.text.trim(),
         phoneNumber: _phoneController.text.trim(),
       );
+      await session.refreshProfile();
       if (!mounted) {
         return;
       }
@@ -143,7 +155,9 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Column(
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
@@ -151,15 +165,16 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 16),
-                        TextField(
+                        TextFormField(
                           controller: _fullNameController,
+                          validator: AppValidators.fullName,
                           decoration: const InputDecoration(
                             labelText: 'Full Name',
                             hintText: 'Enter name',
                           ),
                         ),
                         const SizedBox(height: 16),
-                        TextField(
+                        TextFormField(
                           controller: _emailController,
                           enabled: false,
                           decoration: const InputDecoration(
@@ -167,17 +182,19 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        TextField(
+                        TextFormField(
                           controller: _studentIdController,
+                          validator: (v) => AppValidators.required(v, fieldName: 'Student ID'),
                           decoration: const InputDecoration(
                             labelText: 'Student ID',
                             hintText: '2022-CS-001',
                           ),
                         ),
                         const SizedBox(height: 16),
-                        TextField(
+                        TextFormField(
                           controller: _phoneController,
                           keyboardType: TextInputType.phone,
+                          validator: AppValidators.pakistaniPhone,
                           decoration: const InputDecoration(
                             labelText: 'Phone Number (encrypted at rest)',
                             hintText: '03xx-xxxxxxx',
@@ -197,6 +214,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                               : const Text('Save Changes'),
                         ),
                       ],
+                      ),
                     ),
                   ),
                 ),

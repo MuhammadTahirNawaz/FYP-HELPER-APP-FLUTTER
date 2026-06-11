@@ -1,13 +1,26 @@
-import 'package:file_selector/file_selector.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+﻿import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../repositories/admin_repository.dart';
+import '../../repositories/group_repository.dart';
+import '../../repositories/user_repository.dart';
+import '../../state/session_provider.dart';
 import '../../theme/app_colors.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../services/cloudinary_service.dart';
-import 'student_settings_screen.dart';
-import 'student_nav_bar.dart';
+import '../../widgets/banner_ad_widget.dart';
 import '../auth/sign_out_screen.dart';
+import 'sections/student_announcements_section.dart';
+import 'sections/student_dashboard_home_section.dart';
+import 'sections/student_deadlines_section.dart';
+import 'sections/student_marks_feedback_section.dart';
+import 'sections/student_meeting_requests_section.dart';
+import 'sections/student_shared_documents_section.dart';
+import 'sections/student_submit_proposal_section.dart';
+import 'sections/student_tasks_milestones_section.dart';
+import 'sections/student_upload_documents_section.dart';
+import 'sections/student_weekly_progress_section.dart';
+import 'student_nav_bar.dart';
+import 'student_settings_screen.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
   const StudentDashboardScreen({super.key});
@@ -37,81 +50,60 @@ enum _StudentSection {
 }
 
 class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
-  late _StudentSection _currentSection;
-  late String _currentUid;
-  late DatabaseReference _groupsRef;
-  late DatabaseReference _studentRef;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentSection = _StudentSection.dashboard;
-    _currentUid = FirebaseAuth.instance.currentUser!.uid;
-    _groupsRef = FirebaseDatabase.instance.ref('groups');
-    _studentRef = FirebaseDatabase.instance.ref('users').child(_currentUid);
-    _fetchUniversity();
-  }
-
-  Future<void> _fetchUniversity() async {
-    final snap = await _studentRef.get();
-    if (snap.exists && snap.value is Map) {
-      final data = Map<String, dynamic>.from(snap.value as Map);
-      if (mounted) {
-        setState(() {
-          _university = data['university'] as String?;
-        });
-      }
-    }
-  }
-
-  String? _university;
-  DatabaseReference get _adminRef => FirebaseDatabase.instance.ref('admin/universities/${_university ?? "default"}');
+  _StudentSection _currentSection = _StudentSection.dashboard;
 
   @override
   Widget build(BuildContext context) {
+    final session = context.watch<SessionProvider>();
+    if (session.isLoading && session.profile == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final currentUid = session.uid;
+    if (currentUid == null) {
+      return const Scaffold(
+        body: Center(child: Text('Please sign in again.')),
+      );
+    }
+
+    final userRepository = context.read<UserRepository>();
+    final groupRepository = context.read<GroupRepository>();
+    final adminRepository = context.read<AdminRepository>();
+    final university = session.university;
+
+    final displayName = session.profile?.fullName;
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         elevation: 0,
         centerTitle: false,
-        backgroundColor: Colors.transparent,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
+            Text(_currentSection.label),
             Text(
-              _currentSection.label,
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -0.5, color: Colors.white),
-            ),
-            Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.studentTeal),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Student workspace',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppColors.studentTeal,
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ],
+              'Student workspace',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
             ),
           ],
         ),
         actions: [
           StreamBuilder<DatabaseEvent>(
-            stream: FirebaseDatabase.instance.ref('users/$_currentUid/notifications').onValue,
+            stream: userRepository.usersRef.child('$currentUid/notifications').onValue,
             builder: (context, snapshot) {
               final hasUnread = snapshot.hasData && snapshot.data!.snapshot.value != null;
               return Stack(
                 alignment: Alignment.center,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.notifications_none, color: Colors.white),
+                    icon: const Icon(Icons.notifications_none),
                     onPressed: () {
                       setState(() => _currentSection = _StudentSection.announcements);
                     },
@@ -142,9 +134,19 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
             child: Container(
               margin: const EdgeInsets.only(right: 16),
               child: CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                child: const Icon(Icons.person, color: Colors.white, size: 20),
+                radius: 20,
+                backgroundColor: AppColors.surfaceMuted,
+                child: Text(
+                  (displayName?.isNotEmpty == true
+                          ? displayName!.trim()[0]
+                          : 'S')
+                      .toUpperCase(),
+                  style: const TextStyle(
+                    color: AppColors.navy,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
               ),
             ),
           ),
@@ -160,31 +162,34 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         },
         child: _StudentSectionBody(
           section: _currentSection,
-          groupsRef: _groupsRef,
-          studentRef: _studentRef,
-          adminRef: _adminRef,
-          currentUid: _currentUid,
-          university: _university,
+          groupsRef: groupRepository.groupsRef,
+          studentRef: userRepository.usersRef.child(currentUid),
+          adminRef: adminRepository.universityRef(university),
+          currentUid: currentUid,
+          university: university,
         ),
       ),
-      bottomNavigationBar: const StudentNavBar(selectedIndex: 0),
+      bottomNavigationBar: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          BannerAdWidget(),
+          StudentNavBar(selectedIndex: 0),
+        ],
+      ),
     );
   }
 
   Widget _buildDrawer() {
     return Drawer(
-      backgroundColor: AppColors.bg,
+      backgroundColor: AppColors.surface,
       child: SafeArea(
         child: Column(
           children: [
             Container(
+              width: double.infinity,
               padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.studentTeal.withValues(alpha: 0.2), Colors.transparent],
-                ),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: AppColors.border)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,30 +197,31 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.studentTeal.withValues(alpha: 0.15),
+                      color: AppColors.surfaceMuted,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.studentTeal.withValues(alpha: 0.3)),
                     ),
-                    child: const Icon(Icons.school_outlined, color: AppColors.studentTeal, size: 30),
+                    child: const Icon(Icons.school_outlined, color: AppColors.navy, size: 30),
                   ),
                   const SizedBox(height: 16),
-                  Text(
+                  const Text(
                     'Student Portal',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900, color: Colors.white
-                        ),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      fontSize: 20,
+                    ),
                   ),
                   Text(
                     'Academic Workspace',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.studentTeal,
-                          fontWeight: FontWeight.bold,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
                         ),
                   ),
                 ],
               ),
             ),
-            const Divider(color: AppColors.border, height: 1),
+            const Divider(height: 1),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -228,16 +234,16 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        tileColor: isSelected ? AppColors.studentTeal.withValues(alpha: 0.1) : Colors.transparent,
+                        tileColor: isSelected ? AppColors.surfaceMuted : Colors.transparent,
                         leading: Icon(
                           section.icon,
-                          color: isSelected ? AppColors.studentTeal : AppColors.textSecondary,
+                          color: isSelected ? AppColors.navy : AppColors.textSecondary,
                         ),
                         title: Text(
                           section.label,
                           style: TextStyle(
-                            color: isSelected ? Colors.white : AppColors.textSecondary,
-                            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                            color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                           ),
                         ),
                         onTap: () {
@@ -257,15 +263,25 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.surface.withValues(alpha: 0.2),
+                    color: AppColors.surfaceMuted,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: AppColors.border),
                   ),
                   child: Row(
                     children: [
-                      const CircleAvatar(backgroundColor: AppColors.studentTeal, radius: 18, child: Icon(Icons.logout, color: Colors.black, size: 18)),
+                      CircleAvatar(
+                        backgroundColor: AppColors.navy,
+                        radius: 18,
+                        child: const Icon(Icons.logout, color: Colors.white, size: 18),
+                      ),
                       const SizedBox(width: 12),
-                      Text('Logout Session', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                      const Text(
+                        'Logout Session',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -319,1940 +335,57 @@ class _StudentSectionBodyState extends State<_StudentSectionBody> {
 
         switch (widget.section) {
           case _StudentSection.dashboard:
-            return _StudentDashboardHome(
+            return StudentDashboardHomeSection(
               groupsRef: widget.groupsRef,
-              studentRef: widget.studentRef,
               currentUid: widget.currentUid,
+              displayName: context.read<SessionProvider>().profile?.fullName,
             );
           case _StudentSection.proposal:
-            return _SubmitProposalSection(groupsRef: widget.groupsRef, currentUid: widget.currentUid, groupId: myGroupId);
+            return StudentSubmitProposalSection(
+              groupsRef: widget.groupsRef,
+              currentUid: widget.currentUid,
+              groupId: myGroupId,
+            );
           case _StudentSection.sharedDocuments:
-            return _SharedDocumentsSection(university: widget.university);
+            return StudentSharedDocumentsSection(university: widget.university);
           case _StudentSection.documents:
-            return _UploadDocumentsSection(studentRef: widget.studentRef, currentUid: widget.currentUid, groupsRef: widget.groupsRef, groupId: myGroupId);
+            return StudentUploadDocumentsSection(
+              studentRef: widget.studentRef,
+              currentUid: widget.currentUid,
+              groupsRef: widget.groupsRef,
+              groupId: myGroupId,
+            );
           case _StudentSection.tasks:
-            return _TasksMilestonesSection(groupsRef: widget.groupsRef, groupId: myGroupId);
+            return StudentTasksMilestonesSection(
+              groupsRef: widget.groupsRef,
+              groupId: myGroupId,
+            );
           case _StudentSection.progress:
-            return _WeeklyProgressSection(groupsRef: widget.groupsRef, groupId: myGroupId);
+            return StudentWeeklyProgressSection(
+              groupsRef: widget.groupsRef,
+              groupId: myGroupId,
+            );
           case _StudentSection.meetings:
-            return _MeetingRequestsSection(groupsRef: widget.groupsRef, groupId: myGroupId);
+            return StudentMeetingRequestsSection(
+              groupsRef: widget.groupsRef,
+              groupId: myGroupId,
+              currentUid: widget.currentUid,
+            );
           case _StudentSection.deadlines:
-            return _DeadlinesSection(adminRef: widget.adminRef, groupsRef: widget.groupsRef, groupId: myGroupId);
+            return StudentDeadlinesSection(
+              adminRef: widget.adminRef,
+              groupsRef: widget.groupsRef,
+              groupId: myGroupId,
+            );
           case _StudentSection.announcements:
-            return _AnnouncementsSection(adminRef: widget.adminRef);
+            return StudentAnnouncementsSection(adminRef: widget.adminRef);
           case _StudentSection.marks:
-            return _MarksAndFeedbackSection(groupsRef: widget.groupsRef, groupId: myGroupId);
-        }
-      },
-    );
-  }
-}
-
-class _StudentDashboardHome extends StatelessWidget {
-  const _StudentDashboardHome({
-    required this.groupsRef,
-    required this.studentRef,
-    required this.currentUid,
-  });
-
-  final DatabaseReference groupsRef;
-  final DatabaseReference studentRef;
-  final String currentUid;
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder(
-      stream: groupsRef.onValue,
-      builder: (context, snapshot) {
-        if (snapshot.hasData && snapshot.data!.snapshot.value is Map) {
-          final groups = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
-          
-          final myGroupEntry = groups.entries.where((e) {
-            final members = e.value['members'] is Map ? Map<String, dynamic>.from(e.value['members'] as Map) : {};
-            return members.containsKey(currentUid);
-          }).firstOrNull;
-
-          if (myGroupEntry != null) {
-            final myGroup = Map<String, dynamic>.from(myGroupEntry.value as Map);
-            final proposalStatus = myGroup['proposalStatus'] as String? ?? 'Not Submitted';
-            final supervisorName = myGroup['supervisorName'] as String? ?? 'Not Assigned Yet';
-
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _DashboardBanner(
-                    title: 'Welcome Back!',
-                    subtitle: 'Track your FYP journey and collaborate with your supervisor.',
-                    icon: Icons.waving_hand,
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Supervisor Banner
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: AppColors.border, width: 1.5),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.studentTeal.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Icon(Icons.supervisor_account_outlined, color: AppColors.studentTeal, size: 28),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('SUPERVISOR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.studentTeal, letterSpacing: 1.5)),
-                              const SizedBox(height: 4),
-                              Text(supervisorName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white)),
-                            ],
-                          ),
-                        ),
-                        if (myGroup['supervisorId'] != null)
-                          const Icon(Icons.verified_user, color: AppColors.studentTeal, size: 22),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  GridView.count(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.85, 
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      _StatCard(
-                        title: 'Group Code',
-                        value: myGroupEntry.key,
-                        icon: Icons.tag,
-                        color: const Color(0xFF38BDF8),
-                      ),
-                      _StatCard(
-                        title: 'Proposal Status',
-                        value: proposalStatus,
-                        icon: Icons.description,
-                        color: const Color(0xFFF59E0B),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 160,
-                    child: _StatCard(
-                      title: 'Project Title',
-                      value: myGroup['projectTitle'] ?? 'No Title Set',
-                      icon: Icons.lightbulb_outline,
-                      color: const Color(0xFF10B981),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  if (myGroup['vivaDate'] != null) ...[
-                    Builder(
-                      builder: (context) {
-                        final vivaDate = DateTime.parse(myGroup['vivaDate']);
-                        final now = DateTime.now();
-                        if (vivaDate.isBefore(now.subtract(const Duration(days: 1)))) {
-                          return const SizedBox.shrink();
-                        }
-
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1)),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: Column(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                                  decoration: const BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                  ),
-                                  child: const Row(
-                                    children: [
-                                      Icon(Icons.stars, color: Colors.white, size: 16),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'OFFICIAL VIVA SCHEDULED',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 1,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(20),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF5F3FF),
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        child: const Icon(Icons.calendar_month, color: Color(0xFF8B5CF6)),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              vivaDate.toLocal().toString().split(' ')[0],
-                                              style: const TextStyle(
-                                                fontSize: 22,
-                                                fontWeight: FontWeight.w800,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                            const Text(
-                                              'Set by FYP Committee',
-                                              style: TextStyle(
-                                                color: AppColors.textMuted,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textMuted),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ],
-              ),
+            return StudentMarksAndFeedbackSection(
+              groupsRef: widget.groupsRef,
+              groupId: myGroupId,
             );
-          }
         }
-
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.group_add, size: 64, color: AppColors.studentTeal.withValues(alpha: 0.3)),
-                const SizedBox(height: 16),
-                const Text('No Group Assigned', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                const SizedBox(height: 8),
-                const Text('Join or create a group to start your FYP.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted)),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: () => Navigator.of(context).pushNamed('/student-groups'),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Join or Create Group'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.studentTeal,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
       },
     );
   }
 }
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.border, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.05),
-            blurRadius: 20,
-            spreadRadius: -10,
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const Spacer(),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    fontSize: 24,
-                    letterSpacing: -1,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title.toUpperCase(),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: AppColors.textMuted,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 10,
-                    letterSpacing: 1,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DashboardBanner extends StatelessWidget {
-  const _DashboardBanner({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: AppColors.studentTeal.withValues(alpha: 0.3), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.studentTeal.withValues(alpha: 0.1),
-            blurRadius: 30,
-            spreadRadius: -5,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.studentTeal.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.studentTeal.withValues(alpha: 0.4)),
-              boxShadow: [
-                BoxShadow(color: AppColors.studentTeal.withValues(alpha: 0.3), blurRadius: 15),
-              ],
-            ),
-            child: Icon(icon, color: AppColors.studentTeal, size: 32),
-          ),
-          const SizedBox(width: 24),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-
-class _SupervisorsListSection extends StatefulWidget {
-  const _SupervisorsListSection({
-    required this.groupsRef,
-    required this.studentRef,
-    required this.currentUid,
-    this.groupId,
-  });
-
-  final DatabaseReference groupsRef;
-  final DatabaseReference studentRef;
-  final String currentUid;
-  final String? groupId;
-
-  @override
-  State<_SupervisorsListSection> createState() => _SupervisorsListSectionState();
-}
-
-class _SupervisorsListSectionState extends State<_SupervisorsListSection> {
-  final DatabaseReference _usersRef = FirebaseDatabase.instance.ref('users');
-
-  Future<void> _sendRequest(String supervisorUid, String supervisorName) async {
-    if (widget.groupId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be in a group to request a supervisor.')),
-      );
-      return;
-    }
-
-    try {
-      // 1. Get student and group info
-      final studentSnap = await widget.studentRef.get();
-      final groupSnap = await widget.groupsRef.child(widget.groupId!).get();
-      
-      final studentData = studentSnap.value is Map ? Map<String, dynamic>.from(studentSnap.value as Map) : {};
-      final groupData = groupSnap.value is Map ? Map<String, dynamic>.from(groupSnap.value as Map) : {};
-      
-      final studentName = studentData['name'] ?? 'Unknown Student';
-      final groupName = groupData['groupName'] ?? 'No Group Name';
-      final projectName = groupData['projectTitle'] ?? 'No Project Title';
-
-      // 2. Send request to supervisor
-      final requestRef = FirebaseDatabase.instance.ref('supervisor').child(supervisorUid).child('requests').push();
-      await requestRef.set({
-        'studentId': widget.currentUid,
-        'studentName': studentName,
-        'groupId': widget.groupId,
-        'groupCode': widget.groupId, // Using groupId as code for simplicity
-        'groupName': groupName,
-        'projectName': projectName,
-        'status': 'Pending',
-        'timestamp': ServerValue.timestamp,
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Request sent to $supervisorName')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<DatabaseEvent>(
-      stream: _usersRef.onValue,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final supervisors = <Map<String, dynamic>>[];
-        if (snapshot.hasData && snapshot.data!.snapshot.value is Map) {
-          final allUsers = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
-          allUsers.forEach((uid, data) {
-            if (data is Map && data['role'] == 'supervisor') {
-              supervisors.add({
-                'uid': uid,
-                'name': data['name'] ?? 'Supervisor',
-                'dept': data['department'] ?? 'General',
-              });
-            }
-          });
-        }
-
-        if (supervisors.isEmpty) {
-          return const Center(child: Text('No supervisors found in the system.'));
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: supervisors.length,
-          itemBuilder: (context, index) {
-            final supervisor = supervisors[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: AppColors.borderSoft),
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                leading: CircleAvatar(
-                  backgroundColor: const Color(0xFFEEF2FF),
-                  child: const Icon(Icons.supervisor_account, color: Color(0xFF38BDF8), size: 22),
-                ),
-                title: Text(
-                  supervisor['name'],
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.studentTeal),
-                ),
-                subtitle: Text(supervisor['dept']),
-                trailing: FilledButton.icon(
-                  icon: const Icon(Icons.send, size: 16),
-                  label: const Text('Request'),
-                  onPressed: () => _sendRequest(supervisor['uid'], supervisor['name']),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _SubmitProposalSection extends StatefulWidget {
-  const _SubmitProposalSection({required this.groupsRef, required this.currentUid, this.groupId});
-
-  final DatabaseReference groupsRef;
-  final String currentUid;
-  final String? groupId;
-
-  @override
-  State<_SubmitProposalSection> createState() => _SubmitProposalSectionState();
-}
-
-class _SubmitProposalSectionState extends State<_SubmitProposalSection> {
-  bool _uploading = false;
-  double _progress = 0;
-  late TextEditingController _titleController;
-  late TextEditingController _descController;
-
-  @override
-  void initState() {
-    super.initState();
-    _titleController = TextEditingController();
-    _descController = TextEditingController();
-    _loadExistingData();
-  }
-
-  Future<void> _loadExistingData() async {
-    if (widget.groupId == null) return;
-    final snap = await widget.groupsRef.child(widget.groupId!).get();
-    if (snap.exists && snap.value is Map) {
-      final data = Map<String, dynamic>.from(snap.value as Map);
-      if (mounted) {
-        setState(() {
-          _titleController.text = data['projectTitle'] ?? '';
-          _descController.text = data['description'] ?? '';
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _uploadProposal() async {
-    if (widget.groupId == null) return;
-
-    final typeGroup = XTypeGroup(label: 'PDFs', extensions: ['pdf']);
-    final file = await openFile(acceptedTypeGroups: [typeGroup]);
-    
-    if (file == null) return;
-
-    setState(() {
-      _uploading = true;
-      _progress = 0;
-    });
-
-    try {
-      final bytes = await file.readAsBytes();
-      final url = await CloudinaryService.uploadFile(
-        fileBytes: bytes,
-        fileName: file.name,
-        folder: 'proposals/${widget.groupId}',
-        onProgress: (p) => setState(() => _progress = p),
-      );
-
-      if (url != null) {
-        await widget.groupsRef.child(widget.groupId!).update({
-          'projectTitle': _titleController.text.trim(),
-          'description': _descController.text.trim(),
-          'proposalUrl': url,
-          'proposalStatus': 'Submitted',
-          'proposalSubmittedAt': ServerValue.timestamp,
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Proposal submitted successfully!')));
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _uploading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.groupId == null) return const Center(child: Text('Join a group to submit proposals.'));
-
-    return StreamBuilder(
-      stream: widget.groupsRef.child(widget.groupId!).onValue,
-      builder: (context, snapshot) {
-        final groupData = snapshot.data?.snapshot.value is Map ? Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map) : {};
-        final proposalUrl = groupData['proposalUrl'];
-        final status = groupData['proposalStatus'] ?? 'Not Submitted';
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _DashboardBanner(
-                title: 'FYP Proposal',
-                subtitle: 'Current Status: $status',
-                icon: Icons.assignment_turned_in,
-              ),
-              const SizedBox(height: 24),
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: AppColors.borderSoft),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Proposal Details',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _titleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Project Title',
-                          hintText: 'Enter your project title',
-                          prefixIcon: Icon(Icons.title),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _descController,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Project Summary',
-                          hintText: 'Briefly describe your project',
-                          prefixIcon: Icon(Icons.description),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      const Divider(),
-                      const SizedBox(height: 16),
-                      const Center(child: Icon(Icons.picture_as_pdf, size: 48, color: Color(0xFF38BDF8))),
-                      const SizedBox(height: 12),
-                      if (proposalUrl != null)
-                        Center(
-                          child: Text(
-                            'Current Document: Submitted',
-                            style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                        ),
-                      const SizedBox(height: 20),
-                      if (_uploading)
-                        Column(
-                          children: [
-                            LinearProgressIndicator(value: _progress),
-                            const SizedBox(height: 8),
-                            Text('${(_progress * 100).toInt()}% uploaded'),
-                          ],
-                        )
-                      else
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _uploadProposal,
-                            icon: const Icon(Icons.cloud_upload),
-                            label: Text(proposalUrl == null ? 'Submit Proposal (PDF)' : 'Update & Resubmit'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.studentTeal,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ProposalStatusSection extends StatelessWidget {
-  const _ProposalStatusSection({required this.groupsRef, required this.currentUid});
-
-  final DatabaseReference groupsRef;
-  final String currentUid;
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder(
-      stream: groupsRef.onValue,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-          return const Center(child: Text('No proposal submitted yet'));
-        }
-
-        final groups = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
-        final myGroup = groups.values.whereType<Map>().firstWhere(
-          (group) {
-            final members = group['members'] is Map ? Map<String, dynamic>.from(group['members'] as Map) : {};
-            return members.containsKey(currentUid);
-          },
-          orElse: () => {},
-        );
-
-        if (myGroup.isEmpty) {
-          return const Center(child: Text('You are not part of any group'));
-        }
-
-        final status = myGroup['proposalStatus'] ?? 'Not Submitted';
-        final statusColor = status == 'Approved' ? Colors.green : status == 'Pending' ? Colors.orange : Colors.red;
-
-        return Center(
-          child: Card(
-            margin: const EdgeInsets.all(16),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: statusColor.withValues(alpha: 0.2)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.pending_actions, size: 48, color: statusColor),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    'Proposal Status',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 20,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Chip(
-                    label: Text(status, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                    backgroundColor: statusColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _UploadDocumentsSection extends StatefulWidget {
-  const _UploadDocumentsSection({required this.studentRef, required this.currentUid, required this.groupsRef, this.groupId});
-
-  final DatabaseReference studentRef;
-  final String currentUid;
-  final DatabaseReference groupsRef;
-  final String? groupId;
-
-  @override
-  State<_UploadDocumentsSection> createState() => _UploadDocumentsSectionState();
-}
-
-class _UploadDocumentsSectionState extends State<_UploadDocumentsSection> {
-  bool _uploading = false;
-  double _uploadProgress = 0;
-  String _uploadLabel = '';
-
-  Future<void> _pickAndUploadFile() async {
-    try {
-      final file = await openFile();
-      if (file == null) return;
-
-      final titleController = TextEditingController(text: file.name);
-      final descriptionController = TextEditingController();
-
-      if (!mounted) return;
-
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) {
-          bool isUploading = false;
-          double dialogProgress = 0;
-          String? dialogError;
-
-          Future<void> startUpload(StateSetter setDialogState) async {
-            final title = titleController.text.trim();
-            if (title.isEmpty) {
-              setDialogState(() {
-                dialogError = 'Please enter a title';
-              });
-              return;
-            }
-
-            setDialogState(() {
-              isUploading = true;
-              dialogError = null;
-            });
-
-            final success = await _uploadFile(
-              file,
-              title,
-              descriptionController.text.trim(),
-              onProgress: (progress) {
-                if (!mounted) return;
-                setDialogState(() {
-                  dialogProgress = progress;
-                });
-              },
-            );
-
-            if (!mounted) {
-              return;
-            }
-
-            if (success) {
-              Navigator.of(dialogContext).pop();
-            } else {
-              setDialogState(() {
-                isUploading = false;
-                dialogProgress = 0;
-              });
-            }
-          }
-
-          return StatefulBuilder(
-            builder: (context, setDialogState) {
-              return AlertDialog(
-                title: const Text('Upload Document'),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextField(
-                        controller: titleController,
-                        enabled: !isUploading,
-                        decoration: const InputDecoration(labelText: 'Title'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: descriptionController,
-                        enabled: !isUploading,
-                        decoration: const InputDecoration(labelText: 'Description'),
-                        maxLines: 3,
-                      ),
-                      const SizedBox(height: 12),
-                      Text('File: ${file.name}'),
-                      const SizedBox(height: 16),
-                      if (isUploading) ...[
-                        LinearProgressIndicator(value: dialogProgress.toDouble()),
-                        const SizedBox(height: 8),
-                        Text('Uploading... ${(dialogProgress * 100).toStringAsFixed(0)}%'),
-                      ],
-                      if (dialogError != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          dialogError!,
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: isUploading ? null : () => Navigator.pop(dialogContext),
-                    child: const Text('Cancel'),
-                  ),
-                  FilledButton(
-                    onPressed: isUploading ? null : () => startUpload(setDialogState),
-                    child: Text(isUploading ? 'Uploading' : 'Upload'),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
-  }
-
-  Future<bool> _uploadFile(
-    XFile file,
-    String title,
-    String description, {
-    required ValueChanged<double> onProgress,
-  }) async {
-    try {
-      setState(() {
-        _uploading = true;
-        _uploadLabel = file.name;
-        _uploadProgress = 0;
-      });
-
-      final bytes = await file.readAsBytes();
-      final docId = widget.studentRef.child('documents').push().key;
-      if (docId == null) throw Exception('Failed to generate document ID');
-
-      final downloadUrl = await CloudinaryService.uploadFile(
-        fileBytes: bytes,
-        fileName: file.name,
-        folder: 'student_documents/${widget.currentUid}/$docId',
-        onProgress: (progress) {
-          onProgress(progress);
-          if (mounted) {
-            setState(() {
-              _uploadProgress = progress;
-            });
-          }
-        },
-      );
-
-      if (downloadUrl == null) {
-        throw Exception('Failed to get download URL from Cloudinary');
-      }
-
-      // Save metadata to database (Student private list)
-      await widget.studentRef.child('documents').child(docId).set({
-        'title': title,
-        'description': description,
-        'fileName': file.name,
-        'fileSize': bytes.length,
-        'downloadUrl': downloadUrl,
-        'uploadedAt': DateTime.now().toIso8601String(),
-        'uploadedBy': FirebaseAuth.instance.currentUser?.email ?? '',
-      });
-
-      // Also save to Group node if student is in a group (so Supervisor can see it)
-      if (widget.groupId != null) {
-        await widget.groupsRef.child(widget.groupId!).child('documents').child(docId).set({
-          'title': title,
-          'description': description,
-          'fileName': file.name,
-          'downloadUrl': downloadUrl,
-          'type': 'Group Doc',
-          'uploadedAt': DateTime.now().toIso8601String(),
-          'uploadedBy': FirebaseAuth.instance.currentUser?.email ?? '',
-        });
-      }
-
-      if (mounted) {
-        setState(() => _uploading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Document uploaded successfully')),
-        );
-      }
-      return true;
-    } catch (e) {
-      if (mounted) {
-        setState(() => _uploading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload error: $e')),
-        );
-      }
-      return false;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Upload Documents',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontSize: 20,
-              color: AppColors.studentTeal,
-            ),
-          ),
-          const SizedBox(height: 20),
-          if (_uploading) ...[
-            Text(
-              'Uploading $_uploadLabel',
-              style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.studentTeal),
-            ),
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: _uploadProgress.toDouble(),
-                minHeight: 8,
-                backgroundColor: AppColors.borderSoft,
-                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${(_uploadProgress * 100).toStringAsFixed(0)}%',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 20),
-          ],
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: AppColors.borderSoft),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEEF2FF),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.cloud_upload, size: 48, color: Color(0xFF38BDF8)),
-                  ),
-                  const SizedBox(height: 18),
-                  FilledButton.icon(
-                    icon: const Icon(Icons.add_a_photo),
-                    label: const Text('Choose Document'),
-                    onPressed: _uploading ? null : _pickAndUploadFile,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Your Documents',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: AppColors.studentTeal,
-            ),
-          ),
-          const SizedBox(height: 12),
-          StreamBuilder<DatabaseEvent>(
-            stream: widget.studentRef.child('documents').onValue,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final data = snapshot.data?.snapshot.value;
-              if (data == null) {
-                return const Center(child: Text('No documents uploaded yet'));
-              }
-
-              if (data is! Map) {
-                return const Center(child: Text('No documents uploaded yet'));
-              }
-
-              final docs = (data as Map).entries.toList();
-              return ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: docs.length,
-                itemBuilder: (context, index) {
-                  final doc = Map<String, dynamic>.from(docs[index].value as Map);
-                  final title = doc['title'] ?? 'Untitled';
-                  final fileName = doc['fileName'] ?? 'File';
-                  final uploadedAt = doc['uploadedAt'] ?? '';
-
-                  return Card(
-                    elevation: 0,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: AppColors.borderSoft),
-                    ),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      leading: CircleAvatar(
-                        backgroundColor: const Color(0xFFEEF2FF),
-                        child: const Icon(Icons.description, color: Color(0xFF38BDF8)),
-                      ),
-                      title: Text(
-                        title,
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.studentTeal),
-                      ),
-                      subtitle: Text(
-                        fileName,
-                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.open_in_new, color: Color(0xFF38BDF8)),
-                        onPressed: () async {
-                          final downloadUrl = doc['downloadUrl'];
-                          if (downloadUrl != null) {
-                            final uri = Uri.parse(downloadUrl);
-                            if (await canLaunchUrl(uri)) {
-                              await launchUrl(uri, mode: LaunchMode.externalApplication);
-                            } else {
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Could not open document')),
-                              );
-                            }
-                          }
-                        },
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TasksMilestonesSection extends StatelessWidget {
-  const _TasksMilestonesSection({required this.groupsRef, this.groupId});
-
-  final DatabaseReference groupsRef;
-  final String? groupId;
-
-  @override
-  Widget build(BuildContext context) {
-    if (groupId == null) return const Center(child: Text('Join a group to see tasks.'));
-
-    return StreamBuilder(
-      stream: groupsRef.child(groupId!).child('tasks').onValue,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-          return const Center(child: Text('No tasks assigned by supervisor yet'));
-        }
-
-        final tasks = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
-        final tasksList = tasks.entries.toList();
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: tasksList.length,
-          itemBuilder: (context, index) {
-            final taskId = tasksList[index].key;
-            final task = Map<String, dynamic>.from(tasksList[index].value);
-            final status = task['status'] ?? 'Pending';
-            final isCompleted = status == 'Completed';
-            final isVerified = status == 'Verified';
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: AppColors.borderSoft),
-              ),
-              child: ExpansionTile(
-                leading: CircleAvatar(
-                  backgroundColor: isVerified ? Colors.green[50] : (isCompleted ? Colors.orange[50] : const Color(0xFFFEF3C7)),
-                  child: Icon(
-                    isVerified ? Icons.check_circle : (isCompleted ? Icons.pending : Icons.assignment),
-                    color: isVerified ? Colors.green : (isCompleted ? Colors.orange : const Color(0xFFB45309)),
-                  ),
-                ),
-                title: Text(
-                  task['title'] ?? 'Task ${index + 1}',
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.studentTeal),
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Deadline: ${task['deadline'] ?? 'No'} ${task['deadlineTime'] ?? ''}',
-                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                    ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: isVerified ? 1.0 : (isCompleted ? 0.75 : 0.25),
-                        backgroundColor: AppColors.borderSoft,
-                        color: isVerified ? Colors.green : (isCompleted ? Colors.orange : AppColors.infoBlue),
-                        minHeight: 6,
-                      ),
-                    ),
-                  ],
-                ),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(task['description'] ?? 'No description provided.', style: const TextStyle(fontSize: 13)),
-                        const Divider(height: 24),
-                        if (isVerified) ...[
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(8)),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.grade, color: Colors.green),
-                                const SizedBox(width: 8),
-                                Text('Your Marks: ${((task['memberMarks'] as Map?)?[FirebaseAuth.instance.currentUser?.uid] ?? 0)} / 100', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-                              ],
-                            ),
-                          ),
-                        ] else if (isCompleted) ...[
-                          const Text('Waiting for supervisor verification...', style: TextStyle(color: Colors.orange, fontStyle: FontStyle.italic)),
-                        ] else ...[
-                          const Text('Your Submission:', style: TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          TextField(
-                            decoration: const InputDecoration(
-                              hintText: 'Enter your work link or submission text...',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            maxLines: 2,
-                            onSubmitted: (val) => _submitTask(taskId, val),
-                          ),
-                          const SizedBox(height: 12),
-                          if (_isDeadlinePassed(task['deadline'], task['deadlineTime']))
-                            const Text('Deadline passed. Submissions are closed.', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))
-                          else
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton(
-                                onPressed: () => _showSubmitDialog(context, taskId),
-                                style: FilledButton.styleFrom(backgroundColor: AppColors.studentTeal),
-                                child: const Text('Submit Task'),
-                              ),
-                            ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _submitTask(String taskId, String submission) async {
-    await groupsRef.child(groupId!).child('tasks').child(taskId).update({
-      'submission': submission,
-      'status': 'Completed',
-      'submittedAt': DateTime.now().toIso8601String(),
-    });
-  }
-
-  void _showSubmitDialog(BuildContext context, String taskId) {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Submit Task'),
-        content: TextField(
-          controller: controller,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            hintText: 'Enter document link or description of your work...',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) {
-                _submitTask(taskId, controller.text);
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Submit'),
-          ),
-        ],
-      ),
-    );
-  }
-
-}
-
-bool _isDeadlinePassed(String? dateStr, String? timeStr) {
-  if (dateStr == null || dateStr.isEmpty) return false;
-  try {
-    final date = DateTime.parse(dateStr);
-    int hour = 23;
-    int minute = 59;
-
-    if (timeStr != null && timeStr.isNotEmpty) {
-      final parts = timeStr.trim().split(' ');
-      final timeParts = parts[0].split(':');
-      hour = int.parse(timeParts[0]);
-      minute = int.parse(timeParts[1]);
-      if (parts.length > 1 && parts[1].toUpperCase() == 'PM' && hour < 12) {
-        hour += 12;
-      } else if (parts.length > 1 && parts[1].toUpperCase() == 'AM' && hour == 12) {
-        hour = 0;
-      }
-    }
-
-    final deadline = DateTime(date.year, date.month, date.day, hour, minute);
-    final buffer = (timeStr != null && timeStr.contains(':')) ? const Duration(hours: 2) : Duration.zero;
-    return DateTime.now().isAfter(deadline.add(buffer));
-  } catch (e) {
-    return false;
-  }
-}
-
-class _WeeklyProgressSection extends StatefulWidget {
-  const _WeeklyProgressSection({required this.groupsRef, this.groupId});
-
-  final DatabaseReference groupsRef;
-  final String? groupId;
-
-  @override
-  State<_WeeklyProgressSection> createState() => _WeeklyProgressSectionState();
-}
-
-class _WeeklyProgressSectionState extends State<_WeeklyProgressSection> {
-  double _progressValue = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.groupId == null) return const Center(child: Text('Join a group to update progress.'));
-
-    return StreamBuilder(
-      stream: widget.groupsRef.child(widget.groupId!).onValue,
-      builder: (context, snapshot) {
-        if (snapshot.hasData && snapshot.data!.snapshot.value is Map) {
-          final groupData = snapshot.data!.snapshot.value as Map;
-          _progressValue = (groupData['progressPercentage'] ?? 0).toDouble();
-        }
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Update Project Progress',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              const Text('Slide to update the overall completion percentage of your FYP.', style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 40),
-              Text(
-                '${_progressValue.toInt()}%',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w800, color: Color(0xFF38BDF8)),
-              ),
-              Slider(
-                value: _progressValue,
-                min: 0,
-                max: 100,
-                divisions: 100,
-                label: '${_progressValue.toInt()}%',
-                onChanged: (val) {
-                  setState(() => _progressValue = val);
-                },
-                onChangeEnd: (val) async {
-                  await widget.groupsRef.child(widget.groupId!).update({
-                    'progressPercentage': val.toInt(),
-                    'lastProgressUpdate': DateTime.now().toIso8601String(),
-                  });
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Progress updated successfully')));
-                  }
-                },
-              ),
-              const SizedBox(height: 20),
-              const Card(
-                color: Color(0xFFEEF2FF),
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Color(0xFF38BDF8)),
-                      SizedBox(width: 12),
-                      Expanded(child: Text('This percentage is visible to your supervisor for real-time tracking.', style: TextStyle(fontSize: 12))),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _MeetingRequestsSection extends StatefulWidget {
-  const _MeetingRequestsSection({required this.groupsRef, this.groupId});
-
-  final DatabaseReference groupsRef;
-  final String? groupId;
-
-  @override
-  State<_MeetingRequestsSection> createState() => _MeetingRequestsSectionState();
-}
-
-class _MeetingRequestsSectionState extends State<_MeetingRequestsSection> {
-  late TextEditingController _dateController;
-  late TextEditingController _timeController;
-  String _selectedDuration = '15 min';
-
-  final List<String> _durations = ['5 min', '10 min', '15 min', '30 min', '60 min'];
-
-  @override
-  void initState() {
-    super.initState();
-    _dateController = TextEditingController();
-    _timeController = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _dateController.dispose();
-    _timeController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.groupId == null) return const Center(child: Text('Join a group to request meetings.'));
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _DashboardBanner(
-            title: 'Schedule Meeting',
-            subtitle: 'Request an online video session with your supervisor.',
-            icon: Icons.video_call,
-          ),
-          const SizedBox(height: 24),
-          
-          TextField(
-            controller: _dateController,
-            decoration: InputDecoration(
-              labelText: 'Select Date',
-              hintText: 'YYYY-MM-DD',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              prefixIcon: const Icon(Icons.calendar_today),
-            ),
-            readOnly: true,
-            onTap: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: DateTime.now(),
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 30)),
-              );
-              if (date != null) {
-                _dateController.text = date.toString().split(' ')[0];
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          
-          TextField(
-            controller: _timeController,
-            decoration: InputDecoration(
-              labelText: 'Select Time',
-              hintText: 'HH:MM',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              prefixIcon: const Icon(Icons.access_time),
-            ),
-            readOnly: true,
-            onTap: () async {
-              final time = await showTimePicker(
-                context: context,
-                initialTime: TimeOfDay.now(),
-              );
-              if (time != null) {
-                _timeController.text = time.format(context);
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-
-          DropdownButtonFormField<String>(
-            initialValue: _selectedDuration,
-            decoration: InputDecoration(
-              labelText: 'Duration',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              prefixIcon: const Icon(Icons.timer_outlined),
-            ),
-            items: _durations.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-            onChanged: (val) {
-              if (val != null) setState(() => _selectedDuration = val);
-            },
-          ),
-          const SizedBox(height: 24),
-
-          FilledButton.icon(
-            onPressed: () async {
-              if (_dateController.text.isNotEmpty && _timeController.text.isNotEmpty) {
-                await widget.groupsRef.child(widget.groupId!).child('meetings').push().set({
-                  'requestedDate': _dateController.text,
-                  'requestedTime': _timeController.text,
-                  'duration': _selectedDuration,
-                  'status': 'Pending',
-                  'meetingLink': 'https://meet.google.com/new', // Dummy for now
-                  'timestamp': DateTime.now().toIso8601String(),
-                });
-                _dateController.clear();
-                _timeController.clear();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Meeting request sent!')));
-                }
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select date and time.')));
-              }
-            },
-            icon: const Icon(Icons.send),
-            label: const Text('Request Meeting'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.studentTeal,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          const SizedBox(height: 40),
-          
-          Text('Your Meeting Requests', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          
-          StreamBuilder(
-            stream: widget.groupsRef.child(widget.groupId!).child('meetings').onValue,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-                return const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('No meeting requests yet.')));
-              }
-              final meetings = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
-              final sortedMeetings = meetings.entries.toList()..sort((a, b) => (b.value['timestamp'] as String).compareTo(a.value['timestamp'] as String));
-
-              return Column(
-                children: sortedMeetings.map((entry) {
-                  final m = entry.value as Map;
-                  final status = m['status'] ?? 'Pending';
-                  final isApproved = status == 'Approved';
-
-                  return Card(
-                    elevation: 0,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(color: isApproved ? Colors.green.withValues(alpha: 0.3) : AppColors.borderSoft),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        children: [
-                          ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: isApproved ? Colors.green[50] : AppColors.selectedTile,
-                              child: Icon(Icons.video_call, color: isApproved ? Colors.green : AppColors.studentTeal),
-                            ),
-                            title: Text('${m['requestedDate']} at ${m['requestedTime'] ?? 'N/A'}'),
-                            subtitle: Text('Duration: ${m['duration'] ?? 'N/A'}'),
-                            trailing: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: isApproved ? Colors.green[100] : (status == 'Rejected' ? Colors.red[50] : Colors.orange[50]),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(status, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isApproved ? Colors.green[700] : (status == 'Rejected' ? Colors.red[700] : Colors.orange[700]))),
-                            ),
-                          ),
-                          if (isApproved) ...[
-                            const Divider(height: 24),
-                            if (_isDeadlinePassed(m['requestedDate'], m['requestedTime']))
-                              const Text('Meeting link expired.', style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold))
-                            else
-                              FilledButton.icon(
-                                onPressed: () async {
-                                  final url = Uri.parse(m['meetingLink'] ?? 'https://meet.google.com/new');
-                                  if (await canLaunchUrl(url)) {
-                                    await launchUrl(url);
-                                  }
-                                },
-                                icon: const Icon(Icons.play_arrow, size: 18),
-                                label: const Text('Join Video Meeting'),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: Colors.green[700],
-                                  minimumSize: const Size(double.infinity, 40),
-                                ),
-                              ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DeadlinesSection extends StatelessWidget {
-  const _DeadlinesSection({required this.adminRef, required this.groupsRef, this.groupId});
-
-  final DatabaseReference adminRef;
-  final DatabaseReference groupsRef;
-  final String? groupId;
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Global Deadlines', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          StreamBuilder(
-            stream: adminRef.child('evaluationSchedule').onValue,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData || snapshot.data!.snapshot.value == null) return const Center(child: Text('No global deadlines.'));
-              final schedule = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
-              return Column(
-                children: schedule.values.map((event) => Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.calendar_today, color: Colors.orange),
-                    title: Text(event['eventName'] ?? 'Event'),
-                    subtitle: Text(event['date'] ?? 'TBD'),
-                  ),
-                )).toList(),
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          Text('Group-Specific Deadlines', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          if (groupId == null)
-            const Text('Join a group to see supervisor-set deadlines.')
-          else
-            StreamBuilder(
-              stream: groupsRef.child(groupId!).onValue,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData || snapshot.data!.snapshot.value == null) return const Text('No group deadlines.');
-                final groupData = snapshot.data!.snapshot.value as Map;
-                final deadline = groupData['proposalDeadline'];
-                if (deadline == null) return const Text('No custom deadline set by supervisor yet.');
-                return Card(
-                  color: const Color(0xFFF0FDF4),
-                  child: ListTile(
-                    leading: const Icon(Icons.description, color: Colors.green),
-                    title: const Text('Proposal Submission Deadline'),
-                    subtitle: Text(deadline, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AnnouncementsSection extends StatelessWidget {
-  const _AnnouncementsSection({required this.adminRef});
-
-  final DatabaseReference adminRef;
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder(
-      stream: adminRef.child('announcements').onValue,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-          return const Center(child: Text('No announcements'));
-        }
-
-        final announcements = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
-        final announcementsList = announcements.entries.toList();
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: announcementsList.length,
-          itemBuilder: (context, index) {
-            final announcement = Map<String, dynamic>.from(announcementsList[index].value);
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: AppColors.borderSoft),
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                leading: CircleAvatar(
-                  backgroundColor: const Color(0xFFEEF2FF),
-                  child: const Icon(Icons.notifications, color: Color(0xFF38BDF8)),
-                ),
-                title: Text(
-                  announcement['title'] ?? 'Announcement',
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.studentTeal),
-                ),
-                subtitle: Text(
-                  announcement['content'] ?? '',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _MarksAndFeedbackSection extends StatelessWidget {
-  const _MarksAndFeedbackSection({required this.groupsRef, this.groupId});
-
-  final DatabaseReference groupsRef;
-  final String? groupId;
-
-  @override
-  Widget build(BuildContext context) {
-    if (groupId == null) return const Center(child: Text('Join a group to see marks.'));
-
-    return StreamBuilder(
-      stream: groupsRef.child(groupId!).onValue,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-          return const Center(child: Text('No marks assigned yet'));
-        }
-
-        final groupData = snapshot.data!.snapshot.value as Map;
-        final marks = groupData['marks'];
-        final remarks = groupData['remarks'];
-
-        if (marks == null) return const Center(child: Text('Supervisor has not graded your project yet.'));
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: AppColors.borderSoft),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Project Grade',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: AppColors.studentTeal),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(12)),
-                        child: Text('$marks/100', style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF38BDF8), fontSize: 18)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: marks / 100,
-                      minHeight: 10,
-                      backgroundColor: AppColors.borderSoft,
-                      valueColor: AlwaysStoppedAnimation<Color>(marks >= 50 ? Colors.green : Colors.red),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text('Supervisor Feedback:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  Text(remarks ?? 'No comments provided.', style: const TextStyle(color: Color(0xFF64748B), height: 1.6)),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _SharedDocumentsSection extends StatelessWidget {
-  const _SharedDocumentsSection({this.university});
-  final String? university;
-
-  @override
-  Widget build(BuildContext context) {
-    final uniPath = university ?? 'default';
-    final docsRef = FirebaseDatabase.instance.ref('admin/universities/$uniPath/documents_by_role/Student');
-    
-    return StreamBuilder<DatabaseEvent>(
-      stream: docsRef.onValue,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final data = snapshot.data?.snapshot.value;
-        if (data == null || data is! Map) {
-          return const Center(child: Text('No shared documents available for your role.'));
-        }
-
-        final docs = Map<String, dynamic>.from(data).entries.map((e) {
-          final val = Map<String, dynamic>.from(e.value as Map);
-          return {
-            'title': val['title'] ?? 'Untitled',
-            'description': val['description'] ?? '',
-            'fileName': val['fileName'] ?? '',
-            'fileUrl': val['fileUrl'] ?? '',
-          };
-        }).toList();
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: docs.length,
-          itemBuilder: (context, index) {
-            final doc = docs[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: AppColors.borderSoft),
-              ),
-              child: ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: AppColors.selectedTile,
-                  child: Icon(Icons.description, color: AppColors.studentTeal),
-                ),
-                title: Text(doc['title']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(doc['description']!.isNotEmpty ? doc['description']! : 'File: ${doc['fileName']}'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.open_in_new, color: Color(0xFF38BDF8)),
-                  onPressed: () async {
-                    if (doc['fileUrl']!.isNotEmpty) {
-                      final url = Uri.parse(doc['fileUrl']!);
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(url, mode: LaunchMode.externalApplication);
-                      }
-                    }
-                  },
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-

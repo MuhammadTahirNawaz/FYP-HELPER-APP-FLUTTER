@@ -92,7 +92,7 @@ class DocSubmissionsScreen extends StatelessWidget {
                 child: ListTile(
                   leading: const CircleAvatar(
                     backgroundColor: AppColors.selectedTile,
-                    child: Icon(Icons.description, color: Color(0xFF14375E)),
+                    child: Icon(Icons.description, color: AppColors.navy),
                   ),
                   title: Text(title,
                       style: const TextStyle(fontWeight: FontWeight.w600)),

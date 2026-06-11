@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'user_data_cleanup_service.dart';
+
+import '../core/app_logger.dart';
 import 'crypto_service.dart';
+import 'user_data_cleanup_service.dart';
 
 class AuthService {
   AuthService({FirebaseAuth? auth}) : _auth = auth ?? FirebaseAuth.instance;
@@ -58,9 +60,12 @@ class AuthService {
 
       // 2. Delete the Firebase Auth account
       await user.delete();
-      print('DEBUG AUTH: Successfully deleted auth account for ${user.email}');
+      AppLogger.debug(
+        'Successfully deleted auth account for ${user.email}',
+        tag: 'AUTH',
+      );
     } catch (e) {
-      print('DEBUG AUTH ERROR: Failed to delete account: $e');
+      AppLogger.error('Failed to delete account', tag: 'AUTH', error: e);
       rethrow;
     }
   }

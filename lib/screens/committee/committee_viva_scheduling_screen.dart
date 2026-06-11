@@ -1,5 +1,7 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+
+import '../../services/notification_delivery_service.dart';
 import '../../theme/app_colors.dart';
 
 import 'committee_nav_bar.dart';
@@ -37,10 +39,9 @@ class _CommitteeVivaSchedulingScreenState
         'vivaDate': picked.toIso8601String(),
         'updatedAt': ServerValue.timestamp,
       });
-      
-      // Send notifications to students
-      await _sendVivaNotification(groupCode, picked);
-      
+
+      await _notifyMembersVivaScheduled(groupCode, picked);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Scheduled Viva for group $groupCode')),
@@ -55,30 +56,30 @@ class _CommitteeVivaSchedulingScreenState
     }
   }
 
-  Future<void> _sendVivaNotification(String groupCode, DateTime date) async {
+  Future<void> _notifyMembersVivaScheduled(String groupCode, DateTime date) async {
     final groupSnap = await _groupsRef.child(groupCode).get();
-    if (!groupSnap.exists) return;
+    if (!groupSnap.exists || groupSnap.value == null) {
+      return;
+    }
 
     final data = Map<String, dynamic>.from(groupSnap.value as Map);
     final members = data['members'] as Map?;
-    if (members == null) return;
+    if (members == null) {
+      return;
+    }
 
-    final dateStr = date.toLocal().toString().split(' ')[0];
-    final message = 'Your Viva has been scheduled for $dateStr by the Committee.';
+    final dateStr = date.toLocal().toString().split(' ').first;
+    final body =
+        'Your Viva has been scheduled for $dateStr by the Committee.';
 
-    for (final uid in members.keys) {
-      await FirebaseDatabase.instance
-          .ref('student')
-          .child(uid)
-          .child('notifications')
-          .push()
-          .set({
-        'title': 'Viva Scheduled',
-        'message': message,
-        'timestamp': ServerValue.timestamp,
-        'isRead': false,
-        'type': 'viva',
-      });
+    for (final memberUid in members.keys) {
+      await NotificationDeliveryService.instance.sendToUser(
+        recipientUid: memberUid.toString(),
+        title: 'Viva Scheduled',
+        message: body,
+        type: 'viva',
+        extra: {'groupId': groupCode},
+      );
     }
   }
 
@@ -92,11 +93,9 @@ class _CommitteeVivaSchedulingScreenState
         }
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: AppColors.bg,
         appBar: AppBar(
           elevation: 0,
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF14375E),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new, size: 20),
             onPressed: () => Navigator.of(context).pushReplacementNamed(CommitteeDashboardScreen.routeName),
@@ -105,7 +104,7 @@ class _CommitteeVivaSchedulingScreenState
             'FYP HELPER',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF14375E),
+                  color: AppColors.navy,
                   letterSpacing: 1.2,
                 ),
           ),
@@ -163,7 +162,7 @@ class _CommitteeVivaSchedulingScreenState
                   const SizedBox(height: 4),
                   const Text(
                     'Manage and coordinate evaluation dates for all groups.',
-                    style: TextStyle(color: Colors.white60, fontSize: 13),
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   ),
                 ],
               ),
@@ -296,17 +295,17 @@ class _ScheduleCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(Icons.people_outline, size: 16, color: Colors.white60),
+                            const Icon(Icons.people_outline, size: 16, color: AppColors.textSecondary),
                             const SizedBox(width: 6),
                             Text(
                               '$memberCount Members',
-                              style: const TextStyle(color: Colors.white60, fontSize: 13),
+                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                             ),
                           ],
                         ),

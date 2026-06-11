@@ -1,53 +1,8 @@
 import 'package:firebase_database/firebase_database.dart';
 
+import '../models/user_profile.dart';
+import '../utils/profiler.dart';
 import 'crypto_service.dart';
-
-class UserProfile {
-  const UserProfile({
-    required this.uid,
-    required this.email,
-    required this.role,
-    this.fullName,
-    this.studentId,
-    this.phoneNumber,
-    this.university,
-  });
-
-  final String uid;
-  final String email;
-  final String role;
-  final String? fullName;
-  final String? studentId;
-  final String? phoneNumber;
-  final String? university;
-
-  factory UserProfile.fromMap(
-    String uid,
-    Map<String, dynamic> data, {
-    required CryptoService crypto,
-  }) {
-    final encryptedPhone = data['phoneEncrypted'] as String?;
-    return UserProfile(
-      uid: uid,
-      email: (data['email'] as String?) ?? '',
-      role: (data['role'] as String?) ?? '',
-      fullName: data['fullName'] as String?,
-      studentId: data['studentId'] as String?,
-      university: data['university'] as String?,
-      phoneNumber: encryptedPhone == null
-          ? null
-          : _safeDecrypt(crypto, encryptedPhone),
-    );
-  }
-
-  static String? _safeDecrypt(CryptoService crypto, String input) {
-    try {
-      return crypto.decryptText(input);
-    } catch (_) {
-      return null;
-    }
-  }
-}
 
 class UserProfileService {
   UserProfileService({FirebaseDatabase? database, CryptoService? crypto})
@@ -58,12 +13,27 @@ class UserProfileService {
   final CryptoService _crypto;
 
   Future<UserProfile?> fetchProfile(String uid) async {
-    final snapshot = await _usersRef.child(uid).get();
-    if (!snapshot.exists || snapshot.value == null) {
-      return null;
-    }
-    final data = Map<String, dynamic>.from(snapshot.value as Map);
-    return UserProfile.fromMap(uid, data, crypto: _crypto);
+    return Profiler.profileAsync('Firebase RTDB User Profile Read', () async {
+      final snapshot = await _usersRef.child(uid).get();
+      if (!snapshot.exists || snapshot.value == null) {
+        return null;
+      }
+      final data = Map<String, dynamic>.from(snapshot.value as Map);
+      return UserProfile.fromMap(
+        uid,
+        data,
+        phoneNumber: _decryptPhone(data['phoneEncrypted'] as String?),
+      );
+    });
+  }
+
+  Future<void> writeProfileUpdate(
+    String uid,
+    Map<String, Object?> updates,
+  ) {
+    return Profiler.profileAsync('Firebase RTDB User Profile Write', () async {
+      await _usersRef.child(uid).update(updates);
+    });
   }
 
   Future<void> createProfile({
@@ -86,8 +56,8 @@ class UserProfileService {
       'studentId': studentId,
       'university': university,
       'phoneEncrypted': finalPhoneEncrypted,
-      if (requestedRole != null) 'requestedRole': requestedRole,
-      if (status != null) 'status': status,
+      'requestedRole': ?requestedRole,
+      'status': ?status,
       'createdAt': ServerValue.timestamp,
       'updatedAt': ServerValue.timestamp,
     });
@@ -99,9 +69,9 @@ class UserProfileService {
     String? studentId,
     String? phoneNumber,
   }) async {
-    await _usersRef.child(uid).update({
-      if (fullName != null) 'fullName': fullName,
-      if (studentId != null) 'studentId': studentId,
+    await writeProfileUpdate(uid, {
+      'fullName': ?fullName,
+      'studentId': ?studentId,
       if (phoneNumber != null)
         'phoneEncrypted': _encryptIfPresent(phoneNumber),
       'updatedAt': ServerValue.timestamp,
@@ -123,5 +93,16 @@ class UserProfileService {
       return null;
     }
     return _crypto.encryptText(value.trim());
+  }
+
+  String? _decryptPhone(String? encryptedPhone) {
+    if (encryptedPhone == null) {
+      return null;
+    }
+    try {
+      return _crypto.decryptText(encryptedPhone);
+    } catch (_) {
+      return null;
+    }
   }
 }

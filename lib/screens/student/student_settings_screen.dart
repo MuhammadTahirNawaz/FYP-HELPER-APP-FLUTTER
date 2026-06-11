@@ -5,7 +5,6 @@ import 'student_nav_bar.dart';
 import 'student_notifications_settings_screen.dart';
 import 'student_profile_screen.dart';
 import 'student_security_settings_screen.dart';
-import '../shared/messages_screen.dart';
 import '../auth/sign_out_screen.dart';
 import 'student_dashboard_screen.dart';
 
@@ -106,7 +105,7 @@ class _SettingsTile extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
           backgroundColor: AppColors.selectedTile,
-          child: Icon(icon, color: const Color(0xFF14375E)),
+          child: Icon(icon, color: AppColors.navy),
         ),
         title: Text(title),
         subtitle: Text(subtitle),

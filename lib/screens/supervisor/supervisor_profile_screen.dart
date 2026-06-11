@@ -1,6 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
+
+import '../../theme/app_colors.dart';
+
+import '../../core/validators.dart';
 
 class SupervisorProfileScreen extends StatefulWidget {
   const SupervisorProfileScreen({super.key});
@@ -12,6 +17,7 @@ class SupervisorProfileScreen extends StatefulWidget {
 }
 
 class _SupervisorProfileScreenState extends State<SupervisorProfileScreen> {
+  final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _deptController;
@@ -42,6 +48,9 @@ class _SupervisorProfileScreenState extends State<SupervisorProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
     setState(() => _saving = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -68,13 +77,9 @@ class _SupervisorProfileScreenState extends State<SupervisorProfileScreen> {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text('My Profile'),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [Color(0xFF14375E), Color(0xFF1E6091)]),
-          ),
-        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -83,34 +88,38 @@ class _SupervisorProfileScreenState extends State<SupervisorProfileScreen> {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: Color(0xFFE6E6E6)),
+              side: const BorderSide(color: AppColors.border),
             ),
             child: Padding(
               padding: const EdgeInsets.all(20),
-              child: Column(
+              child: Form(
+                key: _formKey,
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Center(
                     child: CircleAvatar(
                       radius: 40,
-                      backgroundColor: Color(0xFFEDF1F9),
-                      child: Icon(Icons.person, size: 40, color: Color(0xFF14375E)),
+                      backgroundColor: AppColors.surfaceMuted,
+                      child: Icon(Icons.person, size: 40, color: AppColors.navy),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  TextField(
+                  TextFormField(
                     controller: _nameController,
+                    validator: AppValidators.fullName,
                     decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline)),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
+                  TextFormField(
                     controller: _emailController,
                     decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
                     readOnly: true,
                   ),
                   const SizedBox(height: 16),
-                  TextField(
+                  TextFormField(
                     controller: _deptController,
+                    validator: (v) => AppValidators.required(v, fieldName: 'Department'),
                     decoration: const InputDecoration(labelText: 'Department', prefixIcon: Icon(Icons.business_outlined)),
                   ),
                   const SizedBox(height: 32),
@@ -120,6 +129,7 @@ class _SupervisorProfileScreenState extends State<SupervisorProfileScreen> {
                     label: const Text('Save Changes'),
                   ),
                 ],
+                ),
               ),
             ),
           ),

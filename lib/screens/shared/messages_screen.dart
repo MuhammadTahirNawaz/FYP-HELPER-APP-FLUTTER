@@ -1,6 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+
+import '../../core/validators.dart';
+import '../../services/notification_delivery_service.dart';
 import '../../theme/app_colors.dart';
 
 class MessagesScreen extends StatefulWidget {
@@ -22,9 +25,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
       FirebaseDatabase.instance.ref('messages/threads');
   final DatabaseReference _itemsRef =
       FirebaseDatabase.instance.ref('messages/items');
-  final DatabaseReference _usersRef =
-      FirebaseDatabase.instance.ref('users');
   final TextEditingController _messageController = TextEditingController();
+  final _composerFormKey = GlobalKey<FormState>();
 
   String? _selectedThreadId;
   bool _sending = false;
@@ -59,9 +61,53 @@ class _MessagesScreenState extends State<MessagesScreen> {
       'updatedAt': ServerValue.timestamp,
     });
 
+    await _notifyMessageRecipient(threadId, user.uid, text.trim());
+
     _messageController.clear();
     if (mounted) {
       setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _notifyMessageRecipient(
+    String threadId,
+    String senderUid,
+    String text,
+  ) async {
+    try {
+      final threadSnap = await _threadsRef.child(threadId).get();
+      if (!threadSnap.exists || threadSnap.value == null) {
+        return;
+      }
+
+      final thread = Map<String, dynamic>.from(threadSnap.value as Map);
+      final recipientUid = NotificationDeliveryService.resolveMessageRecipient(
+        thread,
+        senderUid,
+      );
+      if (recipientUid == null || recipientUid == senderUid) {
+        return;
+      }
+
+      final senderSnap =
+          await FirebaseDatabase.instance.ref('users/$senderUid').get();
+      final senderData = senderSnap.exists && senderSnap.value is Map
+          ? Map<String, dynamic>.from(senderSnap.value as Map)
+          : <String, dynamic>{};
+      final senderName =
+          senderData['fullName'] as String? ?? senderData['email'] as String? ?? 'Someone';
+
+      final preview = text.length > 120 ? '${text.substring(0, 117)}...' : text;
+
+      await NotificationDeliveryService.instance.sendToUser(
+        recipientUid: recipientUid,
+        title: 'New message from $senderName',
+        message: preview,
+        type: 'message',
+        extra: {'threadId': threadId, 'senderUid': senderUid},
+      );
+    } catch (e) {
+      debugPrint('Failed to notify message recipient: $e');
     }
   }
 
@@ -99,26 +145,32 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Future<void> _startAdminThread() async {
     final emailController = TextEditingController();
     final messageController = TextEditingController();
+    final dialogFormKey = GlobalKey<FormState>();
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('New Message'),
           content: SingleChildScrollView(
-            child: Column(
+            child: Form(
+              key: dialogFormKey,
+              child: Column(
               children: [
-                TextField(
+                TextFormField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
+                  validator: AppValidators.email,
                   decoration: const InputDecoration(labelText: 'User email'),
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                TextFormField(
                   controller: messageController,
+                  validator: (v) => AppValidators.required(v, fieldName: 'Message'),
                   decoration: const InputDecoration(labelText: 'Message'),
                   maxLines: 3,
                 ),
               ],
+              ),
             ),
           ),
           actions: [
@@ -128,11 +180,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
             ),
             FilledButton(
               onPressed: () async {
+                if (!(dialogFormKey.currentState?.validate() ?? false)) return;
                 final email = emailController.text.trim();
                 final message = messageController.text.trim();
-                if (email.isEmpty || message.isEmpty) {
-                  return;
-                }
                 Navigator.of(dialogContext).pop();
                 await _sendToUserByEmail(email, message);
               },
@@ -200,7 +250,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   Widget _buildThreadList(List<_Thread> threads) {
     if (threads.isEmpty) {
-      return const Center(child: Text('No conversations yet.', style: TextStyle(color: Colors.white60)));
+      return const Center(child: Text('No conversations yet.', style: TextStyle(color: AppColors.textSecondary)));
     }
 
     return ListView.builder(
@@ -226,15 +276,15 @@ class _MessagesScreenState extends State<MessagesScreen> {
             ),
             title: Text(
               thread.userEmail,
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+              style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
             subtitle: Text(
               thread.lastMessage.isEmpty ? 'No messages yet.' : thread.lastMessage,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white60, fontSize: 13),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
-            trailing: const Icon(Icons.chevron_right, color: Colors.white24),
+            trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
             onTap: () => setState(() => _selectedThreadId = thread.id),
           ),
         );
@@ -251,7 +301,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
           final messages = _MessageItem.fromSnapshot(data);
 
           if (messages.isEmpty) {
-            return const Center(child: Text('No messages yet.', style: TextStyle(color: Colors.white60)));
+            return const Center(child: Text('No messages yet.', style: TextStyle(color: AppColors.textSecondary)));
           }
 
           return ListView.builder(
@@ -284,7 +334,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                   child: Text(
                     message.text,
                     style: TextStyle(
-                      color: isMe ? Colors.white : Colors.white,
+                      color: isMe ? AppColors.textOnNavy : AppColors.textPrimary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -305,17 +355,20 @@ class _MessagesScreenState extends State<MessagesScreen> {
         color: AppColors.surface,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: Row(
+      child: Form(
+        key: _composerFormKey,
+        child: Row(
         children: [
           Expanded(
-            child: TextField(
+            child: TextFormField(
               controller: _messageController,
               minLines: 1,
               maxLines: 3,
-              style: const TextStyle(color: Colors.white),
+              validator: (v) => AppValidators.required(v, fieldName: 'Message'),
+              style: const TextStyle(color: AppColors.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Type a message...',
-                hintStyle: const TextStyle(color: Colors.white30),
+                hintStyle: const TextStyle(color: AppColors.textMuted),
                 filled: true,
                 fillColor: AppColors.bg,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -335,13 +388,14 @@ class _MessagesScreenState extends State<MessagesScreen> {
               onPressed: _sending
                   ? null
                   : () {
+                      if (!(_composerFormKey.currentState?.validate() ?? false)) return;
                       final text = _messageController.text.trim();
-                      if (text.isEmpty) return;
                       _sendMessage(threadId, text);
                     },
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -350,7 +404,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return const Center(child: Text('Please sign in.', style: TextStyle(color: Colors.white)));
+      return const Center(child: Text('Please sign in.', style: TextStyle(color: AppColors.textPrimary)));
     }
 
     return StreamBuilder<DatabaseEvent>(
@@ -380,7 +434,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white70),
+                      icon: const Icon(Icons.arrow_back, color: AppColors.textSecondary),
                       onPressed: () => setState(() => _selectedThreadId = null),
                     ),
                     const SizedBox(width: 8),
@@ -395,7 +449,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                         children: [
                           Text(
                             thread.userEmail,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
                           ),
                           const Text('Online', style: TextStyle(color: Colors.green, fontSize: 11)),
                         ],
@@ -417,7 +471,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 children: [
                   Text(
                     widget.isAdmin ? 'Conversations' : 'Messages',
-                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 24, fontWeight: FontWeight.w900),
                   ),
                   IconButton(
                     icon: Container(
@@ -441,7 +495,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       const SizedBox(height: 64),
                       Icon(Icons.forum_outlined, size: 64, color: AppColors.border),
                       const SizedBox(height: 16),
-                      const Text('No messages yet.', style: TextStyle(color: Colors.white60)),
+                      const Text('No messages yet.', style: TextStyle(color: AppColors.textSecondary)),
                     ],
                   ),
                 )
@@ -470,29 +524,35 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Future<void> _startUserThread() async {
     final emailController = TextEditingController();
     final messageController = TextEditingController();
+    final dialogFormKey = GlobalKey<FormState>();
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('New Message'),
           content: SingleChildScrollView(
-            child: Column(
+            child: Form(
+              key: dialogFormKey,
+              child: Column(
               children: [
-                TextField(
+                TextFormField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
+                  validator: AppValidators.email,
                   decoration: const InputDecoration(
                     labelText: 'Recipient email',
                     hintText: 'Enter email address',
                   ),
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                TextFormField(
                   controller: messageController,
+                  validator: (v) => AppValidators.required(v, fieldName: 'Message'),
                   decoration: const InputDecoration(labelText: 'Message'),
                   maxLines: 3,
                 ),
               ],
+              ),
             ),
           ),
           actions: [
@@ -502,11 +562,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
             ),
             FilledButton(
               onPressed: () async {
+                if (!(dialogFormKey.currentState?.validate() ?? false)) return;
                 final email = emailController.text.trim();
                 final message = messageController.text.trim();
-                if (email.isEmpty || message.isEmpty) {
-                  return;
-                }
                 Navigator.of(dialogContext).pop();
                 await _sendToUserByEmail(email, message);
               },

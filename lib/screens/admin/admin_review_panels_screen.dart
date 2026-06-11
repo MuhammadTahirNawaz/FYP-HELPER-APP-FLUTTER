@@ -1,5 +1,8 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
+
+import '../../core/validators.dart';
 
 class AdminReviewPanelsScreen extends StatefulWidget {
   const AdminReviewPanelsScreen({super.key});
@@ -21,26 +24,31 @@ class _AdminReviewPanelsScreenState extends State<AdminReviewPanelsScreen> {
         TextEditingController(text: existing?['name'] as String? ?? '');
     final notesCtrl =
         TextEditingController(text: existing?['notes'] as String? ?? '');
+    final dialogFormKey = GlobalKey<FormState>();
 
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(existing == null ? 'Create Panel' : 'Edit Panel'),
-        content: Column(
+        content: Form(
+          key: dialogFormKey,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
+            TextFormField(
               controller: nameCtrl,
+              validator: (v) => AppValidators.required(v, fieldName: 'Panel name'),
               decoration: const InputDecoration(labelText: 'Panel Name'),
             ),
             const SizedBox(height: 12),
-            TextField(
+            TextFormField(
               controller: notesCtrl,
               decoration:
                   const InputDecoration(labelText: 'Notes (optional)'),
               maxLines: 3,
             ),
           ],
+          ),
         ),
         actions: [
           TextButton(
@@ -49,8 +57,8 @@ class _AdminReviewPanelsScreenState extends State<AdminReviewPanelsScreen> {
           ),
           FilledButton(
             onPressed: () async {
+              if (!(dialogFormKey.currentState?.validate() ?? false)) return;
               final name = nameCtrl.text.trim();
-              if (name.isEmpty) return;
               final payload = {
                 'name': name,
                 'notes': notesCtrl.text.trim(),
@@ -142,9 +150,9 @@ class _AdminReviewPanelsScreenState extends State<AdminReviewPanelsScreen> {
               return Card(
                 child: ListTile(
                   leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFEDF1F9),
+                    backgroundColor: AppColors.surfaceMuted,
                     child:
-                        Icon(Icons.fact_check, color: Color(0xFF14375E)),
+                        Icon(Icons.fact_check, color: AppColors.navy),
                   ),
                   title: Text(name,
                       style: const TextStyle(fontWeight: FontWeight.w600)),

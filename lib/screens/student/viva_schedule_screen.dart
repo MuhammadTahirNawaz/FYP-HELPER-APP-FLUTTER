@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 class VivaScheduleScreen extends StatelessWidget {
   const VivaScheduleScreen({super.key});
@@ -57,8 +58,8 @@ class _ScheduleCard extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFFEDF1F9),
-          child: Icon(icon, color: const Color(0xFF14375E)),
+          backgroundColor: AppColors.surfaceMuted,
+          child: Icon(icon, color: AppColors.navy),
         ),
         title: Text(title),
         subtitle: Text(subtitle),

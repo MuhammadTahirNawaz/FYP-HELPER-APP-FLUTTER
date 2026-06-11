@@ -1,8 +1,18 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
+const {
+  notifyUser,
+  sendPushToUser,
+  getUserDisplayName,
+  resolveMessageRecipient,
+} = require("./notification_helpers");
 
 admin.initializeApp();
+
+const rtdb = functions
+  .region("asia-southeast1")
+  .database.instance("fyp-helper-default-rtdb");
 
 const ALLOWED_ROLES = new Set(["Student", "Supervisor", "Committee"]);
 
@@ -157,4 +167,94 @@ exports.resetSystemExceptAdmins = functions.https.onCall(async (data, context) =
     deletedAuthUsers: nonAdminUids.length,
     preservedAdmins: Object.keys(adminUsers).length,
   };
+});
+
+// --- Step 2: Push notifications via Cloud Functions + FCM ---
+
+/** New chat message → in-app notification + device push for the recipient. */
+exports.onNewChatMessage = rtdb
+  .ref("/messages/items/{threadId}/{messageId}")
+  .onCreate(async (snapshot, context) => {
+    const message = snapshot.val();
+    if (!message) {
+      return null;
+    }
+
+    const senderUid = message.senderUid;
+    const text = String(message.text || "").trim();
+    if (!senderUid || !text) {
+      return null;
+    }
+
+    const { threadId } = context.params;
+    const threadSnap = await admin.database().ref(`messages/threads/${threadId}`).get();
+    const recipientUid = resolveMessageRecipient(threadSnap.val(), senderUid);
+    if (!recipientUid || recipientUid === senderUid) {
+      return null;
+    }
+
+    const senderName = await getUserDisplayName(senderUid);
+    const preview = text.length > 120 ? `${text.slice(0, 117)}...` : text;
+
+    await notifyUser(recipientUid, {
+      title: `New message from ${senderName}`,
+      body: preview,
+      type: "message",
+      data: { threadId, senderUid },
+      extra: { threadId, senderUid },
+    });
+
+    functions.logger.info(`Message push queued for ${recipientUid} (thread ${threadId})`);
+    return null;
+  });
+
+/** Group invite / decline alerts already stored in group_notifications → device push. */
+exports.onGroupNotificationCreated = rtdb
+  .ref("/users/{uid}/group_notifications/{notifId}")
+  .onCreate(async (snapshot, context) => {
+    const data = snapshot.val() || {};
+    const { uid } = context.params;
+    const body = String(data.message || "You have a group update.");
+
+    await sendPushToUser(uid, {
+      title: "Group Update",
+      body,
+      data: { type: "group" },
+    });
+
+    return null;
+  });
+
+/** Committee sets viva date → notify all group members. */
+exports.onVivaScheduled = rtdb.ref("/groups/{groupId}").onUpdate(async (change, context) => {
+  const before = change.before.val() || {};
+  const after = change.after.val() || {};
+
+  if (!after.vivaDate || before.vivaDate === after.vivaDate) {
+    return null;
+  }
+
+  const members = after.members || {};
+  const memberUids = Object.keys(members);
+  if (memberUids.length === 0) {
+    return null;
+  }
+
+  const dateStr = String(after.vivaDate).split("T")[0];
+  const { groupId } = context.params;
+
+  await Promise.all(
+    memberUids.map((memberUid) =>
+      notifyUser(memberUid, {
+        title: "Viva Scheduled",
+        body: `Your Viva has been scheduled for ${dateStr} (Group ${groupId}).`,
+        type: "viva",
+        data: { groupId },
+        extra: { groupId },
+      }),
+    ),
+  );
+
+  functions.logger.info(`Viva push sent to ${memberUids.length} members of ${groupId}`);
+  return null;
 });

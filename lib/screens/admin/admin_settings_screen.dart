@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 
-import 'admin_access_control_screen.dart';
 import 'admin_nav_bar.dart';
-import 'admin_notifications_settings_screen.dart';
 import 'admin_profile_settings_screen.dart';
-import 'admin_system_preferences_screen.dart';
 import '../../services/system_reset_service.dart';
 import '../auth/sign_out_screen.dart';
 import 'admin_dashboard_screen.dart';
@@ -194,7 +191,7 @@ class _SettingsTile extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
           backgroundColor: AppColors.selectedTile,
-          child: Icon(icon, color: const Color(0xFF14375E)),
+          child: Icon(icon, color: AppColors.navy),
         ),
         title: Text(title),
         subtitle: Text(subtitle),

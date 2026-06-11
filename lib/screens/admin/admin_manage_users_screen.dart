@@ -59,7 +59,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
       case 'Supervisor': return AppColors.studentTeal;
       case 'Committee': return AppColors.adminPink;
       case 'Admin': return AppColors.adminPink;
-      default: return Colors.white60;
+      default: return AppColors.textSecondary;
     }
   }
 
@@ -73,7 +73,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text(name, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,7 +148,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
-        title: const Text('Manage Users', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text('Manage Users', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: AppColors.adminPink),
           onPressed: () => Navigator.of(context).maybePop(),
@@ -175,7 +175,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               scrollDirection: Axis.horizontal,
               itemCount: _roles.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (_, i) {
                 final role = _roles[i];
                 final selected = _filterRole == role;
@@ -183,13 +183,13 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                   label: Text(role),
                   selected: selected,
                   onSelected: (_) => setState(() => _filterRole = role),
-                  selectedColor: const Color(0xFF14375E),
+                  selectedColor: AppColors.navy,
                   labelStyle: TextStyle(
-                    color: selected ? Colors.white : const Color(0xFF14375E),
+                    color: selected ? AppColors.textOnNavy : AppColors.navy,
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
-                  checkmarkColor: Colors.white,
+                  checkmarkColor: AppColors.textOnNavy,
                   showCheckmark: false,
                 );
               },
@@ -276,7 +276,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         leading: CircleAvatar(
-                          backgroundColor: _roleColor(role).withOpacity(0.12),
+                          backgroundColor: _roleColor(role).withValues(alpha: 0.12),
                           child: Text(
                             initial,
                             style: TextStyle(
@@ -287,7 +287,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                         ),
                         title: Text(
                           name,
-                          style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,7 +303,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                                 padding: const EdgeInsets.symmetric(vertical: 2),
                                 child: Text(
                                   'ID: $studentId',
-                                  style: const TextStyle(fontSize: 10, color: Color(0xFF1E6091), fontWeight: FontWeight.bold),
+                                  style: const TextStyle(fontSize: 10, color: AppColors.navy, fontWeight: FontWeight.bold),
                                 ),
                               ),
                             Row(
@@ -312,7 +312,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: _roleColor(role).withOpacity(0.1),
+                                    color: _roleColor(role).withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
@@ -329,7 +329,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: _statusColor(status).withOpacity(0.1),
+                                    color: _statusColor(status).withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
@@ -379,14 +379,14 @@ class _InfoRow extends StatelessWidget {
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
-                color: Colors.white60,
+                color: AppColors.textSecondary,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
             ),
           ),
         ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import 'admin_committee_management_screen.dart';
 import 'admin_group_records_screen.dart';
@@ -104,8 +105,8 @@ class _ManagementCard extends StatelessWidget {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFFEDF1F9),
-          child: Icon(icon, color: const Color(0xFF14375E)),
+          backgroundColor: AppColors.surfaceMuted,
+          child: Icon(icon, color: AppColors.navy),
         ),
         title: Text(title),
         subtitle: Text(subtitle),

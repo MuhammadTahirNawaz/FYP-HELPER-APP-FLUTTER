@@ -1,5 +1,5 @@
-name: flutter_application_1
-description: "A new Flutter project."
+name: fyp_helper_app
+description: "FYP Helper — final-year project management for students, supervisors, committee, and admins. Targets Android, Windows desktop, and Web (Chrome/Edge)."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -13,6 +13,8 @@ dependencies:
   firebase_auth: ^5.4.2
   cloud_functions: ^5.5.0
   firebase_database: ^11.0.4
+  firebase_messaging: ^15.2.4
+  flutter_local_notifications: ^18.0.1
   encrypt: ^5.0.3
   file_selector: ^1.0.2
   google_fonts: ^6.2.1
@@ -22,7 +24,9 @@ dependencies:
   printing: ^5.14.3
   path_provider: ^2.1.5
   permission_handler: ^11.3.1
-
+  flutter_secure_storage: ^9.2.4
+  google_mobile_ads: ^5.1.0
+  provider: ^6.1.5+1
 dev_dependencies:
   flutter_test:
     sdk: flutter

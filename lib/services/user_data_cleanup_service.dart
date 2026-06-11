@@ -1,5 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+
+import '../core/app_logger.dart';
 /// Service to clean up all user data from Realtime Database and Storage when account is deleted.
 class UserDataCleanupService {
   final FirebaseDatabase _database;
@@ -11,7 +12,10 @@ class UserDataCleanupService {
   /// Delete all user data from database and storage
   Future<void> deleteAllUserData(String uid, String? email) async {
     try {
-      print('DEBUG CLEANUP: Starting deletion of all data for uid=$uid, email=$email');
+      AppLogger.debug(
+        'Starting deletion of all data for uid=$uid, email=$email',
+        tag: 'CLEANUP',
+      );
 
       // 1. Delete user profile from /users
       await _deleteUserProfile(uid);
@@ -34,20 +38,20 @@ class UserDataCleanupService {
       // 7. Delete any notifications
       await _deleteNotifications(uid);
 
-      print('DEBUG CLEANUP: Successfully deleted all data for uid=$uid');
+      AppLogger.debug('Successfully deleted all data for uid=$uid', tag: 'CLEANUP');
     } catch (e) {
-      print('DEBUG CLEANUP ERROR: Failed to delete user data: $e');
+      AppLogger.error('Failed to delete user data', tag: 'CLEANUP', error: e);
       rethrow;
     }
   }
 
-  /// Delete user profile from /users/<uid>
+  /// Delete user profile from `users/{uid}`.
   Future<void> _deleteUserProfile(String uid) async {
     try {
       await _database.ref('users').child(uid).remove();
-      print('DEBUG CLEANUP: Deleted user profile for $uid');
+      AppLogger.debug('Deleted user profile for $uid', tag: 'CLEANUP');
     } catch (e) {
-      print('DEBUG CLEANUP ERROR: Failed to delete user profile: $e');
+      AppLogger.error('Failed to delete user profile', tag: 'CLEANUP', error: e);
     }
   }
 
@@ -61,7 +65,7 @@ class UserDataCleanupService {
         final groups = Map<String, dynamic>.from(snapshot.value as Map);
 
         for (final groupEntry in groups.entries) {
-          final groupCode = groupEntry.key as String;
+          final groupCode = groupEntry.key;
           final groupData = groupEntry.value as Map?;
 
           if (groupData != null) {
@@ -69,7 +73,7 @@ class UserDataCleanupService {
             if (members != null && members.containsKey(uid)) {
               // Remove user from group members
               await groupsRef.child(groupCode).child('members').child(uid).remove();
-              print('DEBUG CLEANUP: Removed $uid from group $groupCode');
+              AppLogger.debug('Removed $uid from group $groupCode', tag: 'CLEANUP');
             }
 
             // If user was leader and group is now empty/broken, optionally delete group
@@ -77,13 +81,16 @@ class UserDataCleanupService {
             if (leaderUid == uid) {
               // Leader deleted — remove the group entirely
               await groupsRef.child(groupCode).remove();
-              print('DEBUG CLEANUP: Deleted group $groupCode (leader $uid deleted account)');
+              AppLogger.debug(
+                'Deleted group $groupCode (leader $uid deleted account)',
+                tag: 'CLEANUP',
+              );
             }
           }
         }
       }
     } catch (e) {
-      print('DEBUG CLEANUP ERROR: Failed to remove user from groups: $e');
+      AppLogger.error('Failed to remove user from groups', tag: 'CLEANUP', error: e);
     }
   }
 
@@ -92,7 +99,7 @@ class UserDataCleanupService {
     try {
       // Delete all invitations under this user's profile
       await _database.ref('users').child(uid).child('invitations').remove();
-      print('DEBUG CLEANUP: Deleted invitations for $uid');
+      AppLogger.debug('Deleted invitations for $uid', tag: 'CLEANUP');
 
       // Also scan all users and remove invitations sent by this user
       final usersRef = _database.ref('users');
@@ -102,7 +109,7 @@ class UserDataCleanupService {
         final users = Map<String, dynamic>.from(snapshot.value as Map);
 
         for (final userEntry in users.entries) {
-          final otherUid = userEntry.key as String;
+          final otherUid = userEntry.key;
           if (otherUid != uid) {
             final userData = userEntry.value as Map?;
             if (userData != null) {
@@ -116,7 +123,10 @@ class UserDataCleanupService {
                         .child('invitations')
                         .child(invCode as String)
                         .remove();
-                    print('DEBUG CLEANUP: Removed invitation from $uid to $otherUid');
+                    AppLogger.debug(
+                      'Removed invitation from $uid to $otherUid',
+                      tag: 'CLEANUP',
+                    );
                   }
                 }
               }
@@ -125,17 +135,17 @@ class UserDataCleanupService {
         }
       }
     } catch (e) {
-      print('DEBUG CLEANUP ERROR: Failed to delete invitations: $e');
+      AppLogger.error('Failed to delete invitations', tag: 'CLEANUP', error: e);
     }
   }
 
-  /// Delete group invites backup from /groupInvites/<uid>
+  /// Delete group invites backup from `groupInvites/{uid}`.
   Future<void> _deleteGroupInvites(String uid) async {
     try {
       await _database.ref('groupInvites').child(uid).remove();
-      print('DEBUG CLEANUP: Deleted groupInvites for $uid');
+      AppLogger.debug('Deleted groupInvites for $uid', tag: 'CLEANUP');
     } catch (e) {
-      print('DEBUG CLEANUP ERROR: Failed to delete groupInvites: $e');
+      AppLogger.error('Failed to delete groupInvites', tag: 'CLEANUP', error: e);
     }
   }
 
@@ -148,9 +158,13 @@ class UserDataCleanupService {
 
       // Delete from database
       await _database.ref('student').child(uid).child('documents').remove();
-      print('DEBUG CLEANUP: Deleted student documents metadata for $uid');
+      AppLogger.debug('Deleted student documents metadata for $uid', tag: 'CLEANUP');
     } catch (e) {
-      print('DEBUG CLEANUP ERROR: Failed to delete user documents metadata: $e');
+      AppLogger.error(
+        'Failed to delete user documents metadata',
+        tag: 'CLEANUP',
+        error: e,
+      );
     }
   }
 
@@ -161,19 +175,17 @@ class UserDataCleanupService {
 
       // Remove from users list under admin
       await adminRef.child('users').child(uid).remove();
-      print('DEBUG CLEANUP: Removed $uid from admin users record');
+      AppLogger.debug('Removed $uid from admin users record', tag: 'CLEANUP');
 
       // Remove from any admin-side invitations/records
       if (email != null) {
         final snapshot = await adminRef.get();
         if (snapshot.exists && snapshot.value is Map) {
-          final adminData = Map<String, dynamic>.from(snapshot.value as Map);
-          // Clean up any references in admin data structures
-          print('DEBUG CLEANUP: Cleaned up admin records for $email');
+          AppLogger.debug('Cleaned up admin records for $email', tag: 'CLEANUP');
         }
       }
     } catch (e) {
-      print('DEBUG CLEANUP ERROR: Failed to remove from admin records: $e');
+      AppLogger.error('Failed to remove from admin records', tag: 'CLEANUP', error: e);
     }
   }
 
@@ -181,9 +193,9 @@ class UserDataCleanupService {
   Future<void> _deleteNotifications(String uid) async {
     try {
       await _database.ref('users').child(uid).child('group_notifications').remove();
-      print('DEBUG CLEANUP: Deleted notifications for $uid');
+      AppLogger.debug('Deleted notifications for $uid', tag: 'CLEANUP');
     } catch (e) {
-      print('DEBUG CLEANUP ERROR: Failed to delete notifications: $e');
+      AppLogger.error('Failed to delete notifications', tag: 'CLEANUP', error: e);
     }
   }
 }

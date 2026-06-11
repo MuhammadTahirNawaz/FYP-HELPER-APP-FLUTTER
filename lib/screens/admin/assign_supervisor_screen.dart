@@ -1,6 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import 'admin_nav_bar.dart';
 
@@ -157,7 +157,7 @@ class _AssignSupervisorScreenState extends State<AssignSupervisorScreen> {
                     Expanded(
                       child: ListView.separated(
                         itemCount: _groups.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final group = _groups[index];
                           final id = group['id'] as String;
@@ -171,17 +171,17 @@ class _AssignSupervisorScreenState extends State<AssignSupervisorScreen> {
                               borderRadius: BorderRadius.circular(14),
                               side: BorderSide(
                                 color: isSelected
-                                    ? const Color(0xFF14375E)
+                                    ? AppColors.navy
                                     : const Color(0xFFDDE3EF),
                                 width: isSelected ? 2 : 1,
                               ),
                             ),
                             leading: CircleAvatar(
-                              backgroundColor: const Color(0xFFEDF1F9),
+                              backgroundColor: AppColors.surfaceMuted,
                               child: Text(
                                 title.isNotEmpty ? title[0].toUpperCase() : 'G',
                                 style: const TextStyle(
-                                    color: Color(0xFF14375E),
+                                    color: AppColors.navy,
                                     fontWeight: FontWeight.w700),
                               ),
                             ),
@@ -201,7 +201,7 @@ class _AssignSupervisorScreenState extends State<AssignSupervisorScreen> {
                                   ? Icons.check_circle
                                   : Icons.radio_button_unchecked,
                               color: isSelected
-                                  ? const Color(0xFF14375E)
+                                  ? AppColors.navy
                                   : const Color(0xFF6B7A99),
                             ),
                             onTap: () => setState(() => _selectedGroupId = id),

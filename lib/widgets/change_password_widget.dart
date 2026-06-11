@@ -1,5 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
+
+import '../core/validators.dart';
 
 /// A reusable widget that handles the full change-password flow using
 /// Firebase Auth (re-authenticate → updatePassword).
@@ -120,7 +123,7 @@ class _ChangePasswordWidgetState extends State<ChangePasswordWidget> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.lock_outline, color: Color(0xFF14375E)),
+                  const Icon(Icons.lock_outline, color: AppColors.navy),
                   const SizedBox(width: 10),
                   Text(
                     'Change Password',
@@ -161,13 +164,9 @@ class _ChangePasswordWidgetState extends State<ChangePasswordWidget> {
                   () => setState(() => _newVisible = !_newVisible),
                 ),
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Enter a new password';
-                  }
-                  if (v.trim().length < 6) {
-                    return 'Password must be at least 6 characters';
-                  }
-                  if (v.trim() == _currentCtrl.text.trim()) {
+                  final passwordError = AppValidators.password(v);
+                  if (passwordError != null) return passwordError;
+                  if (v!.trim() == _currentCtrl.text.trim()) {
                     return 'New password must differ from current';
                   }
                   return null;

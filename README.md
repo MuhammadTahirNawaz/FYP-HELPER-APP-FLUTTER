@@ -1,88 +1,124 @@
-# Flutter Application 1
+# FYP Helper
 
-Flutter project with multi-platform support: Android, iOS, Web, Windows, macOS, and Linux.
+A Flutter app for managing final-year projects (FYP) across universities. It supports role-based workflows for **Students**, **Supervisors**, **Committee** members, and **Admins**.
+
+**Supported platforms:** Android (phones) and Windows (desktop PC) only.
+
+## Features
+
+- Role-based dashboards (Student, Supervisor, Committee, Admin)
+- Firebase Authentication and Realtime Database
+- Document uploads, proposals, progress reports, and viva scheduling
+- Encrypted phone storage and admin user provisioning via Cloud Functions
 
 ## Requirements
 
-Install these tools first:
+1. [Flutter SDK](https://docs.flutter.dev/get-started/install) (stable channel)
+2. Git
+3. Platform tools for your target:
+   - **Android:** Android Studio, Android SDK, emulator or physical device
+   - **Windows:** Visual Studio with **Desktop development with C++** workload
 
-1. Flutter SDK (stable channel)
-2. Dart SDK (included with Flutter)
-3. Git
-4. Platform tools based on where you want to run:
-	- Android: Android Studio + Android SDK + emulator or device
-	- iOS (macOS only): Xcode + CocoaPods
-	- Web: Chrome
-	- Windows desktop: Visual Studio with "Desktop development with C++"
-	- Linux desktop: build essentials and GTK development packages
-	- macOS desktop: Xcode command line tools
-
-## Verify Environment
-
-Run:
+Verify your setup:
 
 ```bash
 flutter doctor
 ```
 
-Fix any issues shown by the doctor output before continuing.
+## Setup
 
-## Get the Project
+1. Clone the repository and install dependencies:
 
 ```bash
 git clone <your-repository-url>
-cd flutter_application_1
+cd FYP-HELPER-APP-FLUTTER
 flutter pub get
 ```
 
+2. Configure Firebase credentials:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your Firebase keys. See [SECURITY_SETUP.md](SECURITY_SETUP.md) for details.
+
+3. Register platform apps in the [Firebase Console](https://console.firebase.google.com/):
+   - **Android** app (for mobile builds)
+   - **Windows** app (for desktop builds)
+
 ## Run the App
 
-1. List available devices:
+**Recommended — use the helper script (Windows PC):**
 
-```bash
-flutter devices
+```powershell
+.\run_app.ps1              # Run on Windows desktop
+.\run_app.ps1 -android     # Run on Android emulator/device
 ```
 
-2. Run on a selected target:
+**Manual commands:**
 
 ```bash
-flutter run
+flutter run -d windows \
+  --dart-define=FIREBASE_WINDOWS_API_KEY=your_key \
+  --dart-define=FIREBASE_WINDOWS_APP_ID=your_app_id \
+  --dart-define=FIREBASE_ANDROID_API_KEY=your_key
+
+flutter run -d android \
+  --dart-define=FIREBASE_WINDOWS_API_KEY=your_key \
+  --dart-define=FIREBASE_WINDOWS_APP_ID=your_app_id \
+  --dart-define=FIREBASE_ANDROID_API_KEY=your_key
 ```
 
-Examples:
+## Build Release
+
+```powershell
+.\run_app.ps1 -build -windows   # Windows desktop executable
+.\run_app.ps1 -build -android   # Android APK
+```
+
+Or manually:
 
 ```bash
-flutter run -d chrome
-flutter run -d windows
-flutter run -d android
+flutter build windows --dart-define=...
+flutter build apk --dart-define=...
 ```
 
-## Build Release Artifacts
+## Project Structure
 
-Use one of these commands depending on your target:
-
-```bash
-flutter build apk
-flutter build appbundle
-flutter build ios
-flutter build web
-flutter build windows
-flutter build macos
-flutter build linux
+```
+lib/
+  core/       Platform helpers and app-wide constants
+  models/     Data models (UserProfile, etc.)
+  screens/    UI by role (admin, student, supervisor, committee, auth, shared)
+              student/sections/ and student/widgets/ split large dashboards
+  services/   Firebase, auth, crypto, file upload
+  theme/      Colors and styling tokens
+  widgets/    Reusable UI components
+  utils/      Download helpers, profiling
+functions/    Firebase Cloud Functions (admin user provisioning)
 ```
 
-## Common Troubleshooting
-
-If dependency or cache issues happen:
+## Troubleshooting
 
 ```bash
 flutter clean
 flutter pub get
 ```
 
-If platform files are missing or outdated:
+If platform files are missing:
 
 ```bash
-flutter create .
+flutter create --platforms=android,windows .
 ```
 
+## Security
+
+Never commit `.env`, keystores, or `google-services.json`. See [SECURITY_SETUP.md](SECURITY_SETUP.md).
+
+Before pushing:
+
+```bash
+git status
+git diff --staged
+```

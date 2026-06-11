@@ -1,5 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 class AdminCommitteeAccessScreen extends StatelessWidget {
   const AdminCommitteeAccessScreen({super.key});
@@ -24,7 +25,6 @@ class AdminCommitteeAccessScreen extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final data = snapshot.data?.snapshot.value;
 
           // Fallback: also query Pending with requestedRole=Committee
           return StreamBuilder<DatabaseEvent>(
@@ -70,9 +70,9 @@ class AdminCommitteeAccessScreen extends StatelessWidget {
                   return Card(
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: const Color(0xFFEDF1F9),
+                        backgroundColor: AppColors.surfaceMuted,
                         child: const Icon(Icons.group_work,
-                            color: Color(0xFF14375E)),
+                            color: AppColors.navy),
                       ),
                       title: Text(name,
                           style: const TextStyle(fontWeight: FontWeight.w600)),

@@ -1,5 +1,9 @@
 import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
+
+import '../core/app_logger.dart';
+import '../utils/profiler.dart';
 
 class CloudinaryService {
   // TODO: Create a free account at cloudinary.com
@@ -11,8 +15,24 @@ class CloudinaryService {
   // Set "Signing Mode" to "Unsigned" and give it a name (e.g., 'fyp_uploads')
   static const String _uploadPreset = 'fyphelper';
 
-  /// Uploads a file to Cloudinary and returns the secure public URL
+  /// Uploads a file to Cloudinary and returns the secure public URL.
   static Future<String?> uploadFile({
+    required Uint8List fileBytes,
+    required String fileName,
+    required String folder,
+    void Function(double)? onProgress,
+  }) {
+    return Profiler.profileAsync('Cloudinary Upload', () async {
+      return _uploadFile(
+        fileBytes: fileBytes,
+        fileName: fileName,
+        folder: folder,
+        onProgress: onProgress,
+      );
+    });
+  }
+
+  static Future<String?> _uploadFile({
     required Uint8List fileBytes,
     required String fileName,
     required String folder,
@@ -24,7 +44,7 @@ class CloudinaryService {
     final formData = FormData.fromMap({
       'file': MultipartFile.fromBytes(fileBytes, filename: fileName),
       'upload_preset': _uploadPreset,
-      'folder': folder, // Organizes files in Cloudinary folders
+      'folder': folder,
     });
 
     try {
@@ -33,20 +53,17 @@ class CloudinaryService {
         data: formData,
         onSendProgress: (int sent, int total) {
           if (onProgress != null && total > 0) {
-            final progress = sent / total;
-            onProgress(progress);
+            onProgress(sent / total);
           }
         },
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Cloudinary returns the secure HTTPS URL under the 'secure_url' key
         return response.data['secure_url'] as String;
-      } else {
-        throw Exception('Failed to upload: ${response.statusMessage}');
       }
+      throw Exception('Failed to upload: ${response.statusMessage}');
     } catch (e) {
-      print('Cloudinary upload error: $e');
+      AppLogger.error('Cloudinary upload failed', tag: 'CLOUDINARY', error: e);
       throw Exception('Cloudinary upload error: $e');
     }
   }

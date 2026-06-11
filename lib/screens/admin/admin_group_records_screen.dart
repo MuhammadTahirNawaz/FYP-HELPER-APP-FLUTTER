@@ -1,6 +1,6 @@
-import 'dart:typed_data';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -148,7 +148,7 @@ class _AdminGroupRecordsScreenState extends State<AdminGroupRecordsScreen> {
                           onPressed: _isGenerating ? null : () => _generatePdf(records),
                           icon: _isGenerating ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.picture_as_pdf),
                           label: const Text('Export to PDF'),
-                          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF14375E), padding: const EdgeInsets.symmetric(vertical: 16)),
+                          style: FilledButton.styleFrom(backgroundColor: AppColors.navy, padding: const EdgeInsets.symmetric(vertical: 16)),
                         ),
                       ),
                     ),
@@ -168,7 +168,7 @@ class _AdminGroupRecordsScreenState extends State<AdminGroupRecordsScreen> {
                                 children: [
                                   Row(
                                     children: [
-                                      Text('Code: ${r.code}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E6091))),
+                                      Text('Code: ${r.code}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.navy)),
                                       const Spacer(),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -178,7 +178,7 @@ class _AdminGroupRecordsScreenState extends State<AdminGroupRecordsScreen> {
                                     ],
                                   ),
                                   const SizedBox(height: 8),
-                                  Text(r.projectTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF14375E))),
+                                  Text(r.projectTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.navy)),
                                   const Divider(height: 24),
                                   const Text('Members:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
                                   const SizedBox(height: 4),
@@ -186,7 +186,7 @@ class _AdminGroupRecordsScreenState extends State<AdminGroupRecordsScreen> {
                                     padding: const EdgeInsets.only(bottom: 4),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.person, size: 14, color: Color(0xFF1E6091)),
+                                        const Icon(Icons.person, size: 14, color: AppColors.navy),
                                         const SizedBox(width: 8),
                                         Text(m, style: const TextStyle(fontSize: 13)),
                                       ],

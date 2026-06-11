@@ -14,61 +14,43 @@ class CommitteeNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-      height: 70,
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      height: 68,
       decoration: BoxDecoration(
-        color: const Color(0xFF000000),
-        borderRadius: BorderRadius.circular(35),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 20,
-            offset: const Offset(0, 10),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(35),
-        child: Theme(
-          data: Theme.of(context).copyWith(
-            navigationBarTheme: NavigationBarThemeData(
-              indicatorColor: AppColors.adminPink.withValues(alpha: 0.15),
-              iconTheme: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) {
-                  return IconThemeData(color: AppColors.adminPink, size: 28);
-                }
-                return const IconThemeData(color: Colors.white60, size: 24);
-              }),
-              labelTextStyle: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) {
-                  return TextStyle(color: AppColors.adminPink, fontSize: 13, fontWeight: FontWeight.w900);
-                }
-                return const TextStyle(color: Colors.white60, fontSize: 11);
-              }),
-            ),
-          ),
-          child: NavigationBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            indicatorColor: Colors.transparent,
-            selectedIndex: selectedIndex,
-            destinations: const [
-              NavigationDestination(icon: Icon(Icons.home_outlined, color: Colors.white), label: 'Dashboard'),
-              NavigationDestination(icon: Icon(Icons.fact_check_outlined, color: Colors.white), label: 'Review'),
-              NavigationDestination(icon: Icon(Icons.event_outlined, color: Colors.white), label: 'Viva'),
-              NavigationDestination(icon: Icon(Icons.settings_outlined, color: Colors.white), label: 'Settings'),
-            ],
-            onDestinationSelected: (index) {
-              if (index == selectedIndex) return;
-              final routeName = switch (index) {
-                0 => CommitteeDashboardScreen.routeName,
-                1 => CommitteeProposalReviewScreen.routeName,
-                2 => CommitteeVivaSchedulingScreen.routeName,
-                _ => CommitteeSettingsScreen.routeName,
-              };
-              Navigator.of(context).pushReplacementNamed(routeName);
-            },
-          ),
+        borderRadius: BorderRadius.circular(28),
+        child: NavigationBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          indicatorColor: AppColors.adminPink.withValues(alpha: 0.12),
+          selectedIndex: selectedIndex,
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Dashboard'),
+            NavigationDestination(icon: Icon(Icons.fact_check_outlined), label: 'Review'),
+            NavigationDestination(icon: Icon(Icons.event_outlined), label: 'Viva'),
+            NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Settings'),
+          ],
+          onDestinationSelected: (index) {
+            if (index == selectedIndex) return;
+            final routeName = switch (index) {
+              0 => CommitteeDashboardScreen.routeName,
+              1 => CommitteeProposalReviewScreen.routeName,
+              2 => CommitteeVivaSchedulingScreen.routeName,
+              _ => CommitteeSettingsScreen.routeName,
+            };
+            Navigator.of(context).pushReplacementNamed(routeName);
+          },
         ),
       ),
     );

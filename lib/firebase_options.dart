@@ -7,20 +7,19 @@ import 'package:flutter/foundation.dart'
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
 /// Firebase credentials are read from environment variables defined at build time.
-/// Set them using --dart-define flags:
-/// ```bash
-/// flutter run \
-///   --dart-define=FIREBASE_WEB_API_KEY=your_key \
-///   --dart-define=FIREBASE_ANDROID_API_KEY=your_key
-/// ```
+/// Set them using --dart-define flags (see `run_app.ps1` and `.env.example`).
 class DefaultFirebaseOptions {
-  // Read API keys from environment (passed via --dart-define)
-  static const String _webApiKey =
-      String.fromEnvironment('FIREBASE_WEB_API_KEY', defaultValue: '');
+  static const String _windowsApiKey =
+      String.fromEnvironment('FIREBASE_WINDOWS_API_KEY', defaultValue: '');
+  static const String _windowsAppId =
+      String.fromEnvironment('FIREBASE_WINDOWS_APP_ID', defaultValue: '');
   static const String _androidApiKey =
       String.fromEnvironment('FIREBASE_ANDROID_API_KEY', defaultValue: '');
+  static const String _webApiKey =
+      String.fromEnvironment('FIREBASE_WEB_API_KEY', defaultValue: '');
+  static const String _webAppId =
+      String.fromEnvironment('FIREBASE_WEB_APP_ID', defaultValue: '');
 
-  // Firestore project constants (shared across platforms)
   static const String _projectId = 'fyp-helper';
   static const String _messagingSenderId = '389478276701';
   static const String _authDomain = 'fyp-helper.firebaseapp.com';
@@ -35,38 +34,40 @@ class DefaultFirebaseOptions {
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
-      case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
-      case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
       case TargetPlatform.linux:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
       default:
         throw UnsupportedError(
-          'DefaultFirebaseOptions are not supported for this platform.',
+          'FYP Helper supports Android, Windows desktop, and Web (Chrome/Edge).',
         );
     }
   }
 
   static FirebaseOptions get web {
-    _validateApiKey(_webApiKey, 'Web');
+    final apiKey = _webApiKey.isNotEmpty ? _webApiKey : _windowsApiKey;
+    final appId = _webAppId.isNotEmpty ? _webAppId : _windowsAppId;
+    _validateApiKey(apiKey, 'Web');
+    _validateAppId(appId, 'Web');
     return FirebaseOptions(
-      apiKey: _webApiKey,
-      appId: '1:389478276701:web:a4f7fb67882d9198e777b4',
+      apiKey: apiKey,
+      appId: appId,
+      messagingSenderId: _messagingSenderId,
+      projectId: _projectId,
+      authDomain: _authDomain,
+      databaseURL: _databaseUrl,
+      storageBucket: _storageBucket,
+    );
+  }
+
+  static FirebaseOptions get windows {
+    _validateApiKey(_windowsApiKey, 'Windows');
+    _validateAppId(_windowsAppId, 'Windows');
+    return FirebaseOptions(
+      apiKey: _windowsApiKey,
+      appId: _windowsAppId,
       messagingSenderId: _messagingSenderId,
       projectId: _projectId,
       authDomain: _authDomain,
@@ -91,7 +92,18 @@ class DefaultFirebaseOptions {
     if (apiKey.isEmpty) {
       throw StateError(
         'Firebase $platform API key is missing. '
-        'Pass it via: --dart-define=FIREBASE_${platform.toUpperCase()}_API_KEY=your_key',
+        'Pass it via --dart-define=FIREBASE_${platform.toUpperCase()}_API_KEY=your_key '
+        '(or use .\\run_app.ps1 -chrome).',
+      );
+    }
+  }
+
+  static void _validateAppId(String appId, String platform) {
+    if (appId.isEmpty) {
+      throw StateError(
+        'Firebase $platform app ID is missing. '
+        'Pass it via --dart-define=FIREBASE_${platform.toUpperCase()}_APP_ID=your_app_id '
+        '(or use .\\run_app.ps1 -chrome).',
       );
     }
   }

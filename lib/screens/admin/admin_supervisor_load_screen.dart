@@ -1,5 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 class AdminSupervisorLoadScreen extends StatelessWidget {
   const AdminSupervisorLoadScreen({super.key});
@@ -96,11 +97,11 @@ class AdminSupervisorLoadScreen extends StatelessWidget {
                       Row(
                         children: [
                           CircleAvatar(
-                            backgroundColor: const Color(0xFFEDF1F9),
+                            backgroundColor: AppColors.surfaceMuted,
                             child: Text(
                               name.isNotEmpty ? name[0].toUpperCase() : 'S',
                               style: const TextStyle(
-                                color: Color(0xFF14375E),
+                                color: AppColors.navy,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -152,11 +153,11 @@ class AdminSupervisorLoadScreen extends StatelessWidget {
                         child: LinearProgressIndicator(
                           value: pct,
                           minHeight: 6,
-                          backgroundColor: const Color(0xFFEDF1F9),
+                          backgroundColor: AppColors.surfaceMuted,
                           valueColor: AlwaysStoppedAnimation<Color>(
                             count > 3
                                 ? const Color(0xFFF59E0B)
-                                : const Color(0xFF14375E),
+                                : AppColors.navy,
                           ),
                         ),
                       ),

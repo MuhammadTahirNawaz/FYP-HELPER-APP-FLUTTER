@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import 'supervisor_nav_bar.dart';
 import 'supervisor_profile_screen.dart';
@@ -152,7 +153,6 @@ class _RequestCardState extends State<_RequestCard> {
     setState(() => _processing = true);
     try {
       final status = accept ? 'Accepted' : 'Rejected';
-      final studentId = widget.requestData['studentId'];
       final groupCode = widget.requestData['groupCode'];
 
       // 1. Update request status
@@ -273,7 +273,7 @@ class _StudentAvatar extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 18,
-          backgroundColor: const Color(0xFFEDF1F9),
+          backgroundColor: AppColors.surfaceMuted,
           child: Text(
             name.substring(0, 1),
             style: const TextStyle(fontSize: 12),

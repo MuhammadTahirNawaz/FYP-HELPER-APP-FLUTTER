@@ -3,6 +3,9 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/dashboard_styles.dart';
+import '../../widgets/dashboard/dashboard_kpi_card.dart';
+import '../../widgets/dashboard/dashboard_welcome_header.dart';
 
 import '../shared/messages_screen.dart';
 import 'committee_nav_bar.dart';
@@ -53,11 +56,10 @@ class _CommitteeDashboardScreenState extends State<CommitteeDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         elevation: 0,
         centerTitle: false,
-        backgroundColor: AppColors.black,
-        foregroundColor: Colors.white,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -69,27 +71,19 @@ class _CommitteeDashboardScreenState extends State<CommitteeDashboardScreen> {
             Text(
               'Committee dashboard',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white70,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
                   ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.account_circle, color: Colors.white),
+            icon: const Icon(Icons.account_circle_outlined),
             onPressed: () => Navigator.of(context).pushNamed('/committee-settings'),
           ),
           const SizedBox(width: 8),
         ],
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.black, AppColors.surfaceStrong],
-            ),
-          ),
-        ),
       ),
       drawer: _CommitteeDrawer(
         selected: _currentSection,
@@ -186,80 +180,88 @@ class _CommitteeDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
+      backgroundColor: AppColors.surface,
       child: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.zero,
+        child: Column(
           children: [
-            DrawerHeader(
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
               decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.black, AppColors.surfaceStrong],
-                ),
+                border: Border(bottom: BorderSide(color: AppColors.border)),
               ),
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const CircleAvatar(
-                      radius: 22,
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.fact_check, color: AppColors.deepBlue),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Committee Panel',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
+                    child: const Icon(
+                      Icons.fact_check_outlined,
+                      color: AppColors.navy,
+                      size: 30,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Review proposals, documents and progress',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white70,
-                          ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Committee Panel',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      fontSize: 20,
                     ),
-                  ],
-                ),
+                  ),
+                  Text(
+                    'Review proposals, documents and progress',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ],
               ),
             ),
-            for (final section in _drawerSections)
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                child: ListTile(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  tileColor: section == selected
-                      ? AppColors.selectedTile
-                      : Colors.transparent,
-                  leading: Icon(
-                    section.icon,
-                    color: section == selected
-                        ? AppColors.primaryBlue
-                        : null,
-                  ),
-                  title: Text(
-                    section.title,
-                    style: TextStyle(
-                      fontWeight: section == selected
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      color: section == selected
-                          ? AppColors.deepBlue
-                          : null,
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                children: [
+                  for (final section in _drawerSections)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        tileColor: section == selected
+                            ? AppColors.surfaceMuted
+                            : Colors.transparent,
+                        leading: Icon(
+                          section.icon,
+                          color: section == selected
+                              ? AppColors.navy
+                              : AppColors.textSecondary,
+                        ),
+                        title: Text(
+                          section.title,
+                          style: TextStyle(
+                            fontWeight: section == selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: section == selected
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                        selected: section == selected,
+                        onTap: () => onSelected(section),
+                      ),
                     ),
-                  ),
-                  selected: section == selected,
-                  onTap: () => onSelected(section),
-                ),
+                ],
               ),
+            ),
           ],
         ),
       ),
@@ -313,45 +315,65 @@ class _CommitteeDashboardHome extends StatelessWidget {
             .length;
 
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
           children: [
-            _SectionBanner(
-              title: 'Committee Overview',
+            DashboardWelcomeHeader(
+              greeting: 'Welcome back',
+              name: 'Committee',
               subtitle:
                   'Track proposal approvals, group status, and review progress from one place.',
-              icon: Icons.insights,
+              accentColor: AppColors.navy,
+              onLightBackground: true,
+              avatar: CircleAvatar(
+                radius: 28,
+                backgroundColor: AppColors.surfaceMuted,
+                child: const Icon(
+                  Icons.fact_check_outlined,
+                  color: AppColors.navy,
+                  size: 28,
+                ),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             GridView.count(
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 1.05,
               children: [
-                _StatCard(
+                DashboardKpiCard(
                   label: 'Total Groups',
                   value: totalGroups.toString(),
-                  icon: Icons.groups,
-                  accent: AppColors.primaryBlue,
+                  icon: Icons.groups_outlined,
+                  accent: AppColors.textOnNavy,
+                  compact: true,
+                  variant: DashboardCardVariant.navy,
                 ),
-                _StatCard(
+                DashboardKpiCard(
                   label: 'Pending Proposals',
                   value: pendingProposals.toString(),
-                  icon: Icons.pending_actions,
-                  accent: const Color(0xFFF59E0B),
+                  icon: Icons.pending_actions_outlined,
+                  accent: AppColors.textOnNavy,
+                  compact: true,
+                  variant: DashboardCardVariant.navy,
                 ),
-                _StatCard(
+                DashboardKpiCard(
                   label: 'Approved Proposals',
                   value: approvedProposals.toString(),
-                  icon: Icons.check_circle,
-                  accent: const Color(0xFF16A34A),
+                  icon: Icons.check_circle_outline,
+                  accent: AppColors.textOnNavy,
+                  compact: true,
+                  variant: DashboardCardVariant.navy,
                 ),
-                _StatCard(
+                DashboardKpiCard(
                   label: 'Delayed Groups',
                   value: delayedGroups.toString(),
-                  icon: Icons.warning,
-                  accent: const Color(0xFFDC2626),
+                  icon: Icons.warning_amber_outlined,
+                  accent: AppColors.textOnNavy,
+                  compact: true,
+                  variant: DashboardCardVariant.navy,
                 ),
               ],
             ),
@@ -360,53 +382,44 @@ class _CommitteeDashboardHome extends StatelessWidget {
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
-                side: const BorderSide(color: Color(0xFFE5E7EB)),
+                side: const BorderSide(color: AppColors.border),
               ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.white, Color(0xFFFFFFFF)],
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Quick Actions',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          _ActionPill(
-                            label: 'Review Proposals',
-                            icon: Icons.fact_check,
-                            onTap: () {},
-                          ),
-                          _ActionPill(
-                            label: 'View Groups',
-                            icon: Icons.groups,
-                            onTap: () {},
-                          ),
-                          _ActionPill(
-                            label: 'Documents',
-                            icon: Icons.folder,
-                            onTap: () {},
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Quick Actions',
+                      style:
+                          Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        _ActionPill(
+                          label: 'Review Proposals',
+                          icon: Icons.fact_check,
+                          onTap: () {},
+                        ),
+                        _ActionPill(
+                          label: 'View Groups',
+                          icon: Icons.groups,
+                          onTap: () {},
+                        ),
+                        _ActionPill(
+                          label: 'Documents',
+                          icon: Icons.folder,
+                          onTap: () {},
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -424,67 +437,6 @@ class _CommitteeDashboardHome extends StatelessWidget {
 
 // ---------------------------------------------------------------------------
 
-class _SectionBanner extends StatelessWidget {
-  const _SectionBanner({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.deepBlue, AppColors.primaryBlue],
-        ),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: Colors.white.withValues(alpha: 0.16),
-            child: Icon(icon, color: Colors.white),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white70,
-                        height: 1.4,
-                      ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-
 class _SectionHint extends StatelessWidget {
   const _SectionHint({required this.text});
 
@@ -495,72 +447,8 @@ class _SectionHint extends StatelessWidget {
     return Text(
       text,
       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: const Color(0xFF64748B),
+            color: AppColors.textSecondary,
           ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.accent,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            accent.withValues(alpha: 0.16),
-            Colors.white,
-          ],
-        ),
-        border: Border.all(color: accent.withValues(alpha: 0.12)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 19,
-              backgroundColor: accent.withValues(alpha: 0.14),
-              child: Icon(icon, color: accent, size: 20),
-            ),
-            const Spacer(),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.deepBlue,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.slateText,
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -1137,38 +1025,6 @@ class _ProposalRowData {
   final bool supervisorApproved;
 }
 
-class _DocumentRowData {
-  const _DocumentRowData({
-    required this.id,
-    required this.title,
-    required this.fileName,
-    required this.fileUrl,
-    required this.roles,
-  });
-
-  final String id;
-  final String title;
-  final String fileName;
-  final String fileUrl;
-  final List<String> roles;
-}
-
-class _ScheduleRowData {
-  const _ScheduleRowData({
-    required this.id,
-    required this.event,
-    required this.date,
-    required this.time,
-    required this.location,
-  });
-
-  final String id;
-  final String event;
-  final String date;
-  final String time;
-  final String location;
-}
-
 class _GroupProgressData {
   const _GroupProgressData({
     required this.code,
@@ -1213,7 +1069,7 @@ class _ProposalReviewSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: Text('Proposal Review Module (Scoped by University)', style: TextStyle(color: Colors.white70)));
+    return const Center(child: Text('Proposal Review Module (Scoped by University)', style: TextStyle(color: AppColors.textSecondary)));
   }
 }
 
@@ -1225,6 +1081,6 @@ class _VivaSchedulingSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: Text('Viva Scheduling Module (Scoped by University)', style: TextStyle(color: Colors.white70)));
+    return const Center(child: Text('Viva Scheduling Module (Scoped by University)', style: TextStyle(color: AppColors.textSecondary)));
   }
 }

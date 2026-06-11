@@ -2,7 +2,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/validators.dart';
 import '../../services/crypto_service.dart';
+import '../../theme/dashboard_styles.dart';
+import '../../widgets/dashboard/dashboard_info_tile.dart';
+import '../../widgets/dashboard/dashboard_kpi_card.dart';
+import '../../widgets/dashboard/dashboard_welcome_header.dart';
 import 'supervisor_nav_bar.dart';
 import '../../utils/download_helper.dart';
 import '../../theme/app_colors.dart';
@@ -73,44 +78,31 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
         elevation: 0,
         centerTitle: false,
-        backgroundColor: AppColors.black,
-        foregroundColor: Colors.white,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              _sectionTitle(_currentSection),
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Colors.white),
-            ),
+            Text(_sectionTitle(_currentSection)),
             Text(
               'Supervisor workspace',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white60,
-                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
                   ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.account_circle, color: Colors.white),
+            icon: const Icon(Icons.account_circle_outlined),
             onPressed: () => Navigator.of(context).pushNamed('/supervisor-settings'),
           ),
           const SizedBox(width: 8),
         ],
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.black, Theme.of(context).colorScheme.primary],
-            ),
-          ),
-        ),
       ),
       drawer: _SupervisorDrawer(
         selected: _currentSection,
@@ -137,7 +129,6 @@ class _SupervisorDashboardScreenState extends State<SupervisorDashboardScreen> {
     final groupsRef = FirebaseDatabase.instance.ref('groups');
     final supervisorRef =
         FirebaseDatabase.instance.ref('supervisor').child(_supervisorUid);
-    final adminRef = FirebaseDatabase.instance.ref('admin');
 
     switch (_currentSection) {
       case _SupervisorSection.dashboard:
@@ -219,68 +210,80 @@ class _SupervisorDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          DrawerHeader(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.black, Theme.of(context).colorScheme.primary],
+      backgroundColor: AppColors.surface,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: AppColors.border)),
               ),
-            ),
-            child: Align(
-              alignment: Alignment.bottomLeft,
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const CircleAvatar(
-                    radius: 22,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.supervisor_account,
-                        color: AppColors.black),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.supervisor_account_outlined,
+                      color: AppColors.navy,
+                      size: 30,
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Supervisor Menu',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Supervisor Portal',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      fontSize: 20,
+                    ),
                   ),
-                  const SizedBox(height: 4),
                   Text(
                     'Requests, approvals, tasks and feedback',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white70,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
                         ),
                   ),
                 ],
               ),
             ),
-          ),
-          _drawerItem(context, Icons.dashboard, 'Dashboard',
-              _SupervisorSection.dashboard),
-          _drawerItem(
-              context, Icons.group, 'Groups', _SupervisorSection.groups),
-          _drawerItem(context, Icons.assignment, 'Proposals',
-              _SupervisorSection.proposals),
-          _drawerItem(
-              context, Icons.task_alt, 'Tasks', _SupervisorSection.tasks),
-          _drawerItem(context, Icons.description, 'Documents',
-              _SupervisorSection.documents),
-          _drawerItem(context, Icons.comment, 'Comments',
-              _SupervisorSection.comments),
-          _drawerItem(
-              context, Icons.event, 'Meetings', _SupervisorSection.meetings),
-          _drawerItem(context, Icons.trending_up, 'Progress',
-              _SupervisorSection.progress),
-          _drawerItem(context, Icons.grade, 'Marks', _SupervisorSection.marks),
-          _drawerItem(context, Icons.calendar_today, 'Deadlines', _SupervisorSection.deadlines),
-          _drawerItem(context, Icons.folder_shared, 'Shared Documents', _SupervisorSection.sharedDocuments),
-        ],
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                children: [
+                  _drawerItem(context, Icons.dashboard_outlined, 'Dashboard',
+                      _SupervisorSection.dashboard),
+                  _drawerItem(
+                      context, Icons.group_outlined, 'Groups', _SupervisorSection.groups),
+                  _drawerItem(context, Icons.assignment_outlined, 'Proposals',
+                      _SupervisorSection.proposals),
+                  _drawerItem(
+                      context, Icons.task_alt_outlined, 'Tasks', _SupervisorSection.tasks),
+                  _drawerItem(context, Icons.description_outlined, 'Documents',
+                      _SupervisorSection.documents),
+                  _drawerItem(context, Icons.comment_outlined, 'Comments',
+                      _SupervisorSection.comments),
+                  _drawerItem(
+                      context, Icons.event_outlined, 'Meetings', _SupervisorSection.meetings),
+                  _drawerItem(context, Icons.trending_up, 'Progress',
+                      _SupervisorSection.progress),
+                  _drawerItem(context, Icons.grade_outlined, 'Marks', _SupervisorSection.marks),
+                  _drawerItem(context, Icons.calendar_today_outlined, 'Deadlines',
+                      _SupervisorSection.deadlines),
+                  _drawerItem(context, Icons.folder_shared_outlined, 'Shared Documents',
+                      _SupervisorSection.sharedDocuments),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -296,17 +299,12 @@ class _SupervisorDrawer extends StatelessWidget {
       tileColor:
           isSelected ? AppColors.selectedTile : Colors.transparent,
       leading: Icon(icon,
-          color: isSelected
-              ? Theme.of(context).colorScheme.primary
-              : AppColors.slateText),
+          color: isSelected ? AppColors.navy : AppColors.textSecondary),
       title: Text(
         label,
         style: TextStyle(
-          color: isSelected
-              ? AppColors.black
-              : AppColors.slateText,
-          fontWeight:
-              isSelected ? FontWeight.w700 : FontWeight.w500,
+          color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
         ),
       ),
       selected: isSelected,
@@ -369,86 +367,96 @@ class _SupervisorDashboardHome extends StatelessWidget {
             final scheduledVivas = myGroups.where((g) => g is Map && g['vivaDate'] != null).toList();
 
             return ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
               children: [
+                DashboardWelcomeHeader(
+                  greeting: 'Welcome back',
+                  name: 'Supervisor',
+                  subtitle:
+                      'Keep requests, proposals, tasks, and marks under control in real time.',
+                  accentColor: AppColors.navy,
+                  onLightBackground: true,
+                  avatar: CircleAvatar(
+                    radius: 28,
+                    backgroundColor: AppColors.surfaceMuted,
+                    child: const Icon(
+                      Icons.supervisor_account_outlined,
+                      color: AppColors.navy,
+                      size: 28,
+                    ),
+                  ),
+                ),
                 if (scheduledVivas.isNotEmpty) ...[
+                  const SizedBox(height: 20),
                   Text(
                     'UPCOMING VIVAS',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppColors.caption,
-                          fontWeight: FontWeight.w900,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w800,
                           letterSpacing: 1.1,
                         ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   ...scheduledVivas.map((group) {
                     final groupData = Map<String, dynamic>.from(group as Map);
                     final vivaDate = DateTime.parse(groupData['vivaDate'] as String);
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                           gradient: LinearGradient(
-                             colors: [AppColors.black, Theme.of(context).colorScheme.primary],
-                             begin: Alignment.topLeft,
-                             end: Alignment.bottomRight,
-                           ),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        children: [
-                          const CircleAvatar(
-                            radius: 20,
-                            backgroundColor: Colors.white24,
-                            child: Icon(Icons.event, color: Colors.white, size: 20),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Group: ${groupData['projectTitle'] ?? 'Untitled'}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                Text(
-                                  'Scheduled: ${vivaDate.toLocal().toString().split(' ')[0]}',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 14),
-                        ],
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: DashboardInfoTile(
+                        label: groupData['projectTitle'] ?? 'Untitled',
+                        value: vivaDate.toLocal().toString().split(' ')[0],
+                        icon: Icons.event_outlined,
+                        accent: AppColors.navy,
+                        variant: DashboardCardVariant.light,
+                        trailing: const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     );
                   }),
-                  const SizedBox(height: 16),
                 ],
-                const _SectionBanner(
-                  title: 'Supervisor Overview',
-                  subtitle: 'Keep requests, proposals, tasks, and marks under control in real time.',
-                  icon: Icons.insights,
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.05,
                   children: [
-                       _StatCard(title: 'Assigned Groups', value: assignedGroupsCount.toString(), icon: Icons.group, color: Theme.of(context).colorScheme.primary),
-                    _StatCard(title: 'Pending Requests', value: pendingRequestsCount.toString(), icon: Icons.pending_actions, color: AppColors.warning),
-                    _StatCard(title: 'Active Tasks', value: activeTasksCount.toString(), icon: Icons.assignment_turned_in, color: AppColors.success),
-                    _StatCard(title: 'Pending Grades', value: pendingGradesCount.toString(), icon: Icons.grade, color: AppColors.primaryIndigo),
+                    DashboardKpiCard(
+                      label: 'Assigned Groups',
+                      value: assignedGroupsCount.toString(),
+                      icon: Icons.groups_outlined,
+                      accent: AppColors.textOnNavy,
+                      compact: true,
+                      variant: DashboardCardVariant.navy,
+                    ),
+                    DashboardKpiCard(
+                      label: 'Pending Requests',
+                      value: pendingRequestsCount.toString(),
+                      icon: Icons.pending_actions_outlined,
+                      accent: AppColors.textOnNavy,
+                      compact: true,
+                      variant: DashboardCardVariant.navy,
+                    ),
+                    DashboardKpiCard(
+                      label: 'Active Tasks',
+                      value: activeTasksCount.toString(),
+                      icon: Icons.assignment_turned_in_outlined,
+                      accent: AppColors.textOnNavy,
+                      compact: true,
+                      variant: DashboardCardVariant.navy,
+                    ),
+                    DashboardKpiCard(
+                      label: 'Pending Grades',
+                      value: pendingGradesCount.toString(),
+                      icon: Icons.grade_outlined,
+                      accent: AppColors.textOnNavy,
+                      compact: true,
+                      variant: DashboardCardVariant.navy,
+                    ),
                   ],
                 ),
               ],
@@ -457,268 +465,6 @@ class _SupervisorDashboardHome extends StatelessWidget {
         );
       },
     );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [color.withValues(alpha: 0.16), Colors.white],
-        ),
-        border: Border.all(color: color.withValues(alpha: 0.12)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: color.withValues(alpha: 0.14),
-              child: Icon(icon, size: 20, color: color),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.black,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.slateText,
-                    fontWeight: FontWeight.w600,
-                  ),
-              textAlign: TextAlign.left,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionBanner extends StatelessWidget {
-  const _SectionBanner({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.black, Theme.of(context).colorScheme.primary],
-        ),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: Colors.white.withValues(alpha: 0.16),
-            child: Icon(icon, color: Colors.white),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white70,
-                        height: 1.4,
-                      ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SupervisionRequestsSection extends StatelessWidget {
-  const _SupervisionRequestsSection({required this.supervisorRef});
-
-  final DatabaseReference supervisorRef;
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<DatabaseEvent>(
-      stream: supervisorRef.child('requests').onValue,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final data = snapshot.data?.snapshot.value;
-        if (data is! Map) {
-          return const Center(child: Text('No requests yet.'));
-        }
-        final entries = Map<String, dynamic>.from(data);
-        final requests = entries.entries
-            .map((e) => _RequestItem(
-                  id: e.key,
-                  studentId: (e.value is Map
-                      ? ((e.value as Map)['studentId'] as String?) ?? ''
-                      : ''),
-                  studentName: (e.value is Map
-                      ? ((e.value as Map)['studentName'] as String?) ?? ''
-                      : ''),
-                  status: (e.value is Map
-                      ? ((e.value as Map)['status'] as String?) ?? ''
-                      : ''),
-                ))
-            .toList();
-
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Text('Supervision Requests',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 16),
-            ...requests
-                .map((r) =>
-                    _RequestCard(request: r, supervisorRef: supervisorRef))
-                .toList(),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _RequestItem {
-  _RequestItem({
-    required this.id,
-    required this.studentId,
-    required this.studentName,
-    required this.status,
-  });
-
-  final String id;
-  final String studentId;
-  final String studentName;
-  final String status;
-}
-
-class _RequestCard extends StatelessWidget {
-  const _RequestCard({required this.request, required this.supervisorRef});
-
-  final _RequestItem request;
-  final DatabaseReference supervisorRef;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(request.studentName,
-                          style: Theme.of(context).textTheme.titleSmall),
-                      Text('ID: ${request.studentId}',
-                          style: Theme.of(context).textTheme.bodySmall),
-                    ],
-                  ),
-                ),
-                Chip(
-                  label: Text(request.status),
-                  backgroundColor: request.status == 'Pending'
-                      ? Colors.orange
-                      : (request.status == 'Accepted'
-                          ? Colors.green
-                          : Colors.red),
-                  labelStyle: const TextStyle(color: Colors.white),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (request.status == 'Pending')
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => _updateStatus(context, 'Rejected'),
-                      child: const Text('Reject'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () => _updateStatus(context, 'Accepted'),
-                      child: const Text('Accept'),
-                    ),
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _updateStatus(BuildContext context, String status) async {
-    try {
-      await supervisorRef
-          .child('requests')
-          .child(request.id)
-          .update({'status': status});
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Request $status')));
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
   }
 }
 
@@ -756,8 +502,7 @@ class _AssignedGroupsSection extends StatelessWidget {
             .map((e) {
               final groupData = Map<String, dynamic>.from(e.value as Map);
               final membersMap = groupData['members'] is Map ? Map<String, dynamic>.from(groupData['members'] as Map) : {};
-              final memberNames = membersMap.values.map((m) => (m is Map ? m['name'] ?? 'Unknown' : 'Unknown')).toList();
-              
+
               return _GroupItem(
                 code: e.key,
                 projectTitle: groupData['projectTitle'] ?? 'No Title',
@@ -774,9 +519,7 @@ class _AssignedGroupsSection extends StatelessWidget {
             Text('Assigned Groups',
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 16),
-            ...assignedGroups
-                .map((g) => _GroupItemCard(group: g))
-                .toList(),
+            ...assignedGroups.map((g) => _GroupItemCard(group: g)),
           ],
         );
       },
@@ -863,7 +606,7 @@ class _GroupItemCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(group.projectTitle, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text(group.projectTitle, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                         const SizedBox(height: 4),
                         Text('Group Code: ${group.code}', style: const TextStyle(color: AppColors.infoBlue, fontWeight: FontWeight.w500)),
                       ],
@@ -877,7 +620,7 @@ class _GroupItemCard extends StatelessWidget {
                 ],
               ),
               const Divider(height: 40),
-              const Text('Group Members', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              const Text('Group Members', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
               const SizedBox(height: 16),
               ...group.memberUids.map((uid) => FutureBuilder<DataSnapshot>(
                     future: usersRef.child(uid).get(),
@@ -1009,10 +752,9 @@ class _ProposalsReviewSection extends StatelessWidget {
             Text('Proposals Review',
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 16),
-            ...proposals
-                .map((p) =>
-                    _ProposalCard(proposal: p, groupsRef: groupsRef))
-                .toList(),
+            ...proposals.map(
+              (p) => _ProposalCard(proposal: p, groupsRef: groupsRef),
+            ),
           ],
         );
       },
@@ -1051,6 +793,7 @@ class _ProposalCard extends StatefulWidget {
 }
 
 class _ProposalCardState extends State<_ProposalCard> {
+  final _formKey = GlobalKey<FormState>();
   bool _isUpdating = false;
   late TextEditingController _marksController;
   late TextEditingController _remarksController;
@@ -1133,22 +876,32 @@ class _ProposalCardState extends State<_ProposalCard> {
                 const SizedBox(height: 24),
                 const Divider(),
                 const SizedBox(height: 16),
-                TextField(
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                TextFormField(
                   controller: _marksController,
                   keyboardType: TextInputType.number,
+                  validator: (v) => AppValidators.required(v, fieldName: 'Marks'),
                   decoration: const InputDecoration(
                     labelText: 'Proposal Marks (0-100)',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.grade),
                   ),
                 ),
-                TextField(
+                TextFormField(
                   controller: _remarksController,
                   maxLines: 2,
+                  validator: (v) => AppValidators.description(v, fieldName: 'Feedback'),
                   decoration: const InputDecoration(
                     labelText: 'Feedback / Remarks',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.comment),
+                  ),
+                ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1215,6 +968,7 @@ class _ProposalCardState extends State<_ProposalCard> {
 
   Future<void> _updateProposal(String status) async {
     if (!mounted) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isUpdating = true);
     try {
       final marks = int.tryParse(_marksController.text) ?? 0;
@@ -1309,7 +1063,7 @@ class _TasksSection extends StatelessWidget {
                     onPressed: () => _showCreateTaskDialog(context, myGroups),
                     icon: const Icon(Icons.add),
                     label: const Text('Add'),
-                    style: FilledButton.styleFrom(backgroundColor: AppColors.black),
+                    style: FilledButton.styleFrom(backgroundColor: AppColors.navy),
                   ),
               ],
             ),
@@ -1329,6 +1083,7 @@ class _TasksSection extends StatelessWidget {
     final deadlineController = TextEditingController();
     final timeController = TextEditingController();
     String? selectedGroup = groups.first.key;
+    final dialogFormKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
@@ -1336,7 +1091,9 @@ class _TasksSection extends StatelessWidget {
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Create Group Task'),
           content: SingleChildScrollView(
-            child: Column(
+            child: Form(
+              key: dialogFormKey,
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
@@ -1345,10 +1102,11 @@ class _TasksSection extends StatelessWidget {
                   onChanged: (v) => setDialogState(() => selectedGroup = v),
                   decoration: const InputDecoration(labelText: 'Target Group'),
                 ),
-                TextField(controller: titleController, style: const TextStyle(fontWeight: FontWeight.normal), decoration: const InputDecoration(labelText: 'Task Title')),
-                TextField(controller: descController, style: const TextStyle(fontWeight: FontWeight.normal), decoration: const InputDecoration(labelText: 'Description')),
-                TextField(
+                TextFormField(controller: titleController, validator: AppValidators.projectTitle, style: const TextStyle(fontWeight: FontWeight.normal), decoration: const InputDecoration(labelText: 'Task Title')),
+                TextFormField(controller: descController, validator: AppValidators.description, style: const TextStyle(fontWeight: FontWeight.normal), decoration: const InputDecoration(labelText: 'Description')),
+                TextFormField(
                   controller: deadlineController,
+                  validator: (v) => AppValidators.required(v, fieldName: 'Deadline date'),
                   style: const TextStyle(fontWeight: FontWeight.normal),
                   decoration: const InputDecoration(labelText: 'Deadline Date', hintText: 'YYYY-MM-DD'),
                   readOnly: true,
@@ -1364,8 +1122,9 @@ class _TasksSection extends StatelessWidget {
                     }
                   },
                 ),
-                TextField(
+                TextFormField(
                   controller: timeController,
+                  validator: (v) => AppValidators.required(v, fieldName: 'Deadline time'),
                   style: const TextStyle(fontWeight: FontWeight.normal),
                   decoration: const InputDecoration(labelText: 'Deadline Time', hintText: 'HH:MM'),
                   readOnly: true,
@@ -1382,23 +1141,24 @@ class _TasksSection extends StatelessWidget {
                   },
                 ),
               ],
+              ),
             ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             FilledButton(
               onPressed: () async {
-                if (titleController.text.isNotEmpty && selectedGroup != null) {
-                  await groupsRef.child(selectedGroup!).child('tasks').push().set({
-                    'title': titleController.text,
-                    'description': descController.text,
-                    'deadline': deadlineController.text,
-                    'deadlineTime': timeController.text,
-                    'status': 'Pending',
-                    'createdAt': DateTime.now().toIso8601String(),
-                  });
-                  if (ctx.mounted) Navigator.pop(ctx);
-                }
+                if (!(dialogFormKey.currentState?.validate() ?? false)) return;
+                if (selectedGroup == null) return;
+                await groupsRef.child(selectedGroup!).child('tasks').push().set({
+                  'title': titleController.text,
+                  'description': descController.text,
+                  'deadline': deadlineController.text,
+                  'deadlineTime': timeController.text,
+                  'status': 'Pending',
+                  'createdAt': DateTime.now().toIso8601String(),
+                });
+                if (ctx.mounted) Navigator.pop(ctx);
               },
               child: const Text('Create'),
             ),
@@ -1513,7 +1273,7 @@ class _TaskCardState extends State<_TaskCard> {
                               icon: const Icon(Icons.open_in_new, size: 16),
                               label: const Text('Open Submission Link'),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.black,
+                                foregroundColor: Colors.white,
                                 side: const BorderSide(color: Colors.black),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
@@ -1824,43 +1584,6 @@ class _CommentsSection extends StatelessWidget {
   }
 }
 
-class _CommentItem {
-  _CommentItem(
-      {required this.id,
-      required this.content,
-      required this.submissionId});
-
-  final String id;
-  final String content;
-  final String submissionId;
-}
-
-class _CommentCard extends StatelessWidget {
-  const _CommentCard({required this.comment});
-
-  final _CommentItem comment;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Submission: ${comment.submissionId}',
-                style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 8),
-            Text(comment.content,
-                style: Theme.of(context).textTheme.bodyMedium),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _MeetingRequestsSection extends StatelessWidget {
   const _MeetingRequestsSection({required this.supervisorUid, required this.groupsRef, this.university});
 
@@ -2008,7 +1731,7 @@ class _MeetingCard extends StatelessWidget {
                   Expanded(
                     child: FilledButton(
                       onPressed: () => _updateStatus(context, 'Approved'),
-                      style: FilledButton.styleFrom(backgroundColor: AppColors.black),
+                      style: FilledButton.styleFrom(backgroundColor: AppColors.navy),
                       child: const Text('Approve'),
                     ),
                   ),
@@ -2123,7 +1846,7 @@ class _ProgressMonitoringSection extends StatelessWidget {
                 projectTitle: groupData['projectTitle'] ?? 'No Title',
                 percentage: progress is int ? progress : 0,
               );
-            }).toList(),
+            }),
           ],
         );
       },
@@ -2262,7 +1985,7 @@ class _MarksRemarksSectionState extends State<_MarksRemarksSection> {
                   ),
                 ),
               );
-            }).toList(),
+            }),
           ],
         );
       },
@@ -2272,34 +1995,41 @@ class _MarksRemarksSectionState extends State<_MarksRemarksSection> {
   void _showMarkDialog(BuildContext context, String groupCode, dynamic currentMarks, dynamic currentRemarks) {
     final marksController = TextEditingController(text: currentMarks?.toString() ?? '');
     final remarksController = TextEditingController(text: currentRemarks?.toString() ?? '');
+    final dialogFormKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Grade Group: $groupCode'),
         content: SingleChildScrollView(
-          child: Column(
+          child: Form(
+            key: dialogFormKey,
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
+              TextFormField(
                 controller: marksController,
+                validator: (v) => AppValidators.required(v, fieldName: 'Marks'),
                 style: const TextStyle(fontWeight: FontWeight.normal),
                 decoration: const InputDecoration(labelText: 'Marks (0-100)'),
                 keyboardType: TextInputType.number,
               ),
-              TextField(
+              TextFormField(
                 controller: remarksController,
+                validator: (v) => AppValidators.description(v, fieldName: 'Remarks'),
                 style: const TextStyle(fontWeight: FontWeight.normal),
                 decoration: const InputDecoration(labelText: 'Remarks'),
                 maxLines: 3,
               ),
             ],
+            ),
           ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
             onPressed: () async {
+              if (!(dialogFormKey.currentState?.validate() ?? false)) return;
               await widget.groupsRef.child(groupCode).update({
                 'marks': int.tryParse(marksController.text) ?? 0,
                 'remarks': remarksController.text,
@@ -2456,7 +2186,7 @@ class _DeadlinesSection extends StatelessWidget {
                   ),
                 ),
               );
-            }).toList(),
+            }),
           ],
         );
       },
@@ -2465,13 +2195,17 @@ class _DeadlinesSection extends StatelessWidget {
 
   void _showDeadlineDialog(BuildContext context, String groupCode) {
     final dateController = TextEditingController();
+    final dialogFormKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Set Proposal Deadline for $groupCode'),
-        content: TextField(
+        content: Form(
+          key: dialogFormKey,
+          child: TextFormField(
           controller: dateController,
+          validator: (v) => AppValidators.required(v, fieldName: 'Deadline'),
           style: const TextStyle(fontWeight: FontWeight.normal),
           decoration: const InputDecoration(labelText: 'Deadline (YYYY-MM-DD)'),
           readOnly: true,
@@ -2484,11 +2218,13 @@ class _DeadlinesSection extends StatelessWidget {
             );
             if (d != null) dateController.text = d.toString().split(' ')[0];
           },
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
             onPressed: () async {
+              if (!(dialogFormKey.currentState?.validate() ?? false)) return;
               await groupsRef.child(groupCode).update({
                 'proposalDeadline': dateController.text,
               });
@@ -2545,7 +2281,7 @@ class _SharedDocumentsSection extends StatelessWidget {
               child: ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: AppColors.selectedTile,
-                  child: const Icon(Icons.description, color: AppColors.black),
+                  child: Icon(Icons.description, color: AppColors.black),
                 ),
                 title: Text(doc['title'], style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text(doc['description'].isNotEmpty ? doc['description'] : doc['fileName']),

@@ -1,11 +1,11 @@
 {
-    "name": "flutter_application_1",
-    "short_name": "flutter_application_1",
+    "name": "FYP Helper",
+    "short_name": "FYP Helper",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Final-year project management for students, supervisors, committee, and admins.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

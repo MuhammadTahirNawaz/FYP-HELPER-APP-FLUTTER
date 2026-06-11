@@ -1,5 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
 
 import 'committee_nav_bar.dart';
 import 'committee_dashboard_screen.dart';
@@ -198,7 +199,7 @@ class _ProposalCardState extends State<_ProposalCard> {
       ),
       child: ExpansionTile(
         leading: CircleAvatar(
-          backgroundColor: const Color(0xFFEDF1F9),
+          backgroundColor: AppColors.surfaceMuted,
           child: Text(widget.item.groupCode[0]),
         ),
         title: Text('Group ${widget.item.groupCode}'),
@@ -234,7 +235,7 @@ class _ProposalCardState extends State<_ProposalCard> {
                       label: Text(
                         'Committee: ${widget.item.committeeApproved ? 'Approved' : 'Pending'}',
                       ),
-                      backgroundColor: statusColor.withOpacity(0.2),
+                      backgroundColor: statusColor.withValues(alpha: 0.2),
                     ),
                   ],
                 ),

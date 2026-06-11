@@ -1,6 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import '../../theme/app_colors.dart';
+
+import '../../theme/app_colors.dart';
 
 import 'supervisor_nav_bar.dart';
 import 'supervisor_dashboard_screen.dart';
@@ -34,18 +37,12 @@ class _SupervisorProgressReportsScreenState extends State<SupervisorProgressRepo
         }
       },
       child: Scaffold(
+        backgroundColor: AppColors.bg,
         appBar: AppBar(
           title: const Text('Progress Reports'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.of(context).pushReplacementNamed(SupervisorDashboardScreen.routeName),
-          ),
-          flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF14375E), Color(0xFF1E6091)],
-              ),
-            ),
           ),
         ),
         body: StreamBuilder<DatabaseEvent>(
@@ -77,11 +74,12 @@ class _SupervisorProgressReportsScreenState extends State<SupervisorProgressRepo
                 final groupData = Map<String, dynamic>.from(group.value as Map);
                 final title = groupData['projectTitle'] ?? 'No Title';
                 final progress = groupData['progressPercentage'] ?? 0;
-                final lastUpdate = groupData['lastProgressUpdate'] ?? 'No updates yet';
+                final lastUpdate =
+                    groupData['lastProgressUpdate'] ?? 'No updates yet';
 
                 return _ReportCard(
                   title: title,
-                  subtitle: 'Overall Progress: $progress%',
+                  subtitle: 'Overall Progress: $progress% · $lastUpdate',
                   progress: progress.toDouble(),
                 );
               },
@@ -112,15 +110,15 @@ class _ReportCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE6E6E6)),
+        side: const BorderSide(color: AppColors.border),
       ),
       child: Column(
         children: [
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             leading: const CircleAvatar(
-              backgroundColor: Color(0xFFEDF1F9),
-              child: Icon(Icons.analytics, color: Color(0xFF14375E)),
+              backgroundColor: AppColors.surfaceMuted,
+              child: Icon(Icons.analytics, color: AppColors.navy),
             ),
             title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(subtitle),

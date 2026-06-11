@@ -1,6 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+
+import '../../core/validators.dart';
+import '../../theme/app_colors.dart';
 import '../../widgets/change_password_widget.dart';
 
 class AdminProfileSettingsScreen extends StatefulWidget {
@@ -15,6 +18,7 @@ class AdminProfileSettingsScreen extends StatefulWidget {
 
 class _AdminProfileSettingsScreenState
     extends State<AdminProfileSettingsScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _deptCtrl = TextEditingController();
   bool _saving = false;
@@ -47,6 +51,9 @@ class _AdminProfileSettingsScreenState
   }
 
   Future<void> _saveProfile() async {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
     setState(() => _saving = true);
     try {
       await _userRef.update({
@@ -97,13 +104,15 @@ class _AdminProfileSettingsScreenState
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
-                      child: Column(
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Row(
                             children: [
                               const Icon(Icons.account_circle,
-                                  color: Color(0xFF14375E)),
+                                  color: AppColors.navy),
                               const SizedBox(width: 10),
                               Text(
                                 'Admin Profile',
@@ -117,6 +126,7 @@ class _AdminProfileSettingsScreenState
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: _nameCtrl,
+                            validator: AppValidators.fullName,
                             decoration: const InputDecoration(
                                 labelText: 'Full Name',
                                 hintText: 'Enter your name'),
@@ -134,6 +144,7 @@ class _AdminProfileSettingsScreenState
                           const SizedBox(height: 12),
                           TextFormField(
                             controller: _deptCtrl,
+                            validator: (v) => AppValidators.required(v, fieldName: 'Department'),
                             decoration: const InputDecoration(
                                 labelText: 'Department',
                                 hintText: 'e.g. Computer Science'),
@@ -151,6 +162,7 @@ class _AdminProfileSettingsScreenState
                                 : const Text('Save Changes'),
                           ),
                         ],
+                        ),
                       ),
                     ),
                   ),

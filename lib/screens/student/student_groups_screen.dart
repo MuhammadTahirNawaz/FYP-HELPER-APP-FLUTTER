@@ -1,6 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+
+import '../../core/app_logger.dart';
+import '../../core/validators.dart';
 import 'student_dashboard_screen.dart';
 import 'student_nav_bar.dart';
 
@@ -14,6 +17,8 @@ class StudentGroupsScreen extends StatefulWidget {
 }
 
 class _StudentGroupsScreenState extends State<StudentGroupsScreen> {
+  final _createGroupFormKey = GlobalKey<FormState>();
+  final _inviteFormKey = GlobalKey<FormState>();
   final DatabaseReference _groupsRef = FirebaseDatabase.instance.ref('groups');
   final DatabaseReference _usersRef = FirebaseDatabase.instance.ref('users');
 
@@ -64,6 +69,8 @@ class _StudentGroupsScreenState extends State<StudentGroupsScreen> {
   }
 
   Future<void> _createGroupAndInvite() async {
+    if (!(_createGroupFormKey.currentState?.validate() ?? false)) return;
+
     final user = FirebaseAuth.instance.currentUser!;
     
     // Fetch user university
@@ -143,16 +150,23 @@ class _StudentGroupsScreenState extends State<StudentGroupsScreen> {
       int invitesSent = 0;
       for (final email in resolvedUids.keys) {
         final inviteeUid = resolvedUids[email]!;
-        print('DEBUG: Attempting to send invite to $email (UID: $inviteeUid) for group $groupCode');
+        AppLogger.debug(
+          'Attempting to send invite to $email (UID: $inviteeUid) for group $groupCode',
+          tag: 'GROUPS',
+        );
         try {
           await _usersRef.child(inviteeUid).child('invitations').child(groupCode).set({
             'leaderEmail': user.email,
             'timestamp': DateTime.now().millisecondsSinceEpoch,
           });
-          print('DEBUG: Successfully wrote invite to database for $email!');
+          AppLogger.debug('Successfully wrote invite for $email', tag: 'GROUPS');
           invitesSent++;
         } catch (e) {
-          print('DEBUG ERROR: Failed to write invite to database for $email! Error: $e');
+          AppLogger.error(
+            'Failed to write invite for $email',
+            tag: 'GROUPS',
+            error: e,
+          );
           _showSnackBar('Failed to send invite to $email: $e');
         }
       }
@@ -240,8 +254,9 @@ class _StudentGroupsScreenState extends State<StudentGroupsScreen> {
   }
 
   Future<void> _inviteNewMember(String groupCode) async {
+    if (!(_inviteFormKey.currentState?.validate() ?? false)) return;
+
     final email = _newMemberController.text.trim();
-    if (email.isEmpty) return;
 
     final user = FirebaseAuth.instance.currentUser!;
     if (email == user.email) {
@@ -355,7 +370,10 @@ class _StudentGroupsScreenState extends State<StudentGroupsScreen> {
                 final groupId = userData?['groupId'] as String?;
                 final notifications = userData?['group_notifications'] as Map?;
                 final invitations = userData?['invitations'] as Map?;
-                print('DEBUG USER NODE: uid=${user.uid} email=${user.email} groupId=$groupId invitations=$invitations');
+                AppLogger.debug(
+                  'uid=${user.uid} email=${user.email} groupId=$groupId invitations=$invitations',
+                  tag: 'GROUPS',
+                );
 
                 // 1. If already in a group, show group details
                 if (groupId != null && groupId.isNotEmpty) {
@@ -469,7 +487,12 @@ class _StudentGroupsScreenState extends State<StudentGroupsScreen> {
         const SizedBox(height: 8),
         const Text('Select group size and invite members.'),
         const SizedBox(height: 16),
-        
+
+        Form(
+          key: _createGroupFormKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
         DropdownButtonFormField<int>(
           value: _requiredSize,
           decoration: const InputDecoration(labelText: 'Total Group Size', border: OutlineInputBorder()),
@@ -502,8 +525,10 @@ class _StudentGroupsScreenState extends State<StudentGroupsScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
+                  child: TextFormField(
                     controller: entry.value,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: AppValidators.email,
                     decoration: InputDecoration(labelText: 'Invite Member ${entry.key + 2} Email'),
                   ),
                 ),
@@ -518,6 +543,9 @@ class _StudentGroupsScreenState extends State<StudentGroupsScreen> {
           child: _isLoading 
             ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
             : const Text('Send Invitations & Create Group'),
+        ),
+            ],
+          ),
         ),
       ],
     );
@@ -602,11 +630,15 @@ class _StudentGroupsScreenState extends State<StudentGroupsScreen> {
               const SizedBox(height: 24),
               const Text('Invite Missing Member', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Row(
+              Form(
+                key: _inviteFormKey,
+                child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: TextFormField(
                       controller: _newMemberController,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: AppValidators.email,
                       decoration: const InputDecoration(labelText: 'Member Email', border: OutlineInputBorder()),
                     ),
                   ),
@@ -616,6 +648,7 @@ class _StudentGroupsScreenState extends State<StudentGroupsScreen> {
                     child: const Text('Invite'),
                   ),
                 ],
+                ),
               ),
             ],
             

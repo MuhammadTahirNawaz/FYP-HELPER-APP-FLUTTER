@@ -1,6 +1,8 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/validators.dart';
+
 import 'admin_nav_bar.dart';
 import 'admin_dashboard_screen.dart';
 
@@ -21,6 +23,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     final periodController = TextEditingController(text: entry?.period ?? '');
     final ownerController = TextEditingController(text: entry?.owner ?? '');
     final summaryController = TextEditingController(text: entry?.summary ?? '');
+    final dialogFormKey = GlobalKey<FormState>();
 
     await showDialog<void>(
       context: context,
@@ -28,29 +31,36 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
         return AlertDialog(
           title: Text(entry == null ? 'Add Report' : 'Edit Report'),
           content: SingleChildScrollView(
-            child: Column(
+            child: Form(
+              key: dialogFormKey,
+              child: Column(
               children: [
-                TextField(
+                TextFormField(
                   controller: titleController,
+                  validator: AppValidators.projectTitle,
                   decoration: const InputDecoration(labelText: 'Title'),
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                TextFormField(
                   controller: periodController,
+                  validator: (v) => AppValidators.required(v, fieldName: 'Period'),
                   decoration: const InputDecoration(labelText: 'Period'),
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                TextFormField(
                   controller: ownerController,
+                  validator: (v) => AppValidators.required(v, fieldName: 'Owner'),
                   decoration: const InputDecoration(labelText: 'Owner'),
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                TextFormField(
                   controller: summaryController,
+                  validator: (v) => AppValidators.description(v, fieldName: 'Summary'),
                   decoration: const InputDecoration(labelText: 'Summary'),
                   maxLines: 4,
                 ),
               ],
+              ),
             ),
           ),
           actions: [
@@ -60,10 +70,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
             ),
             FilledButton(
               onPressed: () async {
+                if (!(dialogFormKey.currentState?.validate() ?? false)) return;
                 final title = titleController.text.trim();
-                if (title.isEmpty) {
-                  return;
-                }
                 final payload = {
                   'title': title,
                   'period': periodController.text.trim(),
